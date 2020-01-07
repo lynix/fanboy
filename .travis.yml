@@ -1,0 +1,20 @@
+os: linux
+dist: bionic
+language: cpp
+addons:
+  apt:
+    packages:
+    - arduino-mk
+cache:
+  directories:
+    - ~/arduino
+before_install:
+  - IDE_VERSION="1.8.9"
+  - IDE_DIR=~/arduino
+  - IDE_TAR=arduino-${IDE_VERSION}-linux64.tar.xz
+  - test -e ${IDE_DIR}/arduino || wget http://downloads.arduino.cc/${IDE_TAR}
+  - mkdir -p ${IDE_DIR}
+  - test -e ${IDE_DIR}/arduino || tar -xJf ${IDE_TAR} -C ${IDE_DIR} --strip-components=1
+  - rm -f ${IDE_TAR}
+script:
+  - make -C firmware ARDUINO_DIR=${IDE_DIR} ARCHITECTURE=avr
