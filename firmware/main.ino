@@ -192,6 +192,8 @@ void handle_serial()
         }
     }
 
+    // must not use S_ERROR() here as that would touch the same buffer
+    // `command` is pointing to
     Serial.print("Error: unknown command '");
     Serial.print(command);
     Serial.println("'");
