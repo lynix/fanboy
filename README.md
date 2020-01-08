@@ -115,7 +115,7 @@ duty on Linux:
 
 ```
 $ stty -F /dev/ttyACM0 57600 cs8 -cstopb -parenb
-$ echo 'set 1 75' > /dev/ttyACM0
+$ echo 'set 2 75' > /dev/ttyACM0
 ```
 
 ### Commands
@@ -124,7 +124,7 @@ The serial interface supports the following commands:
 
 | Command                    | Description                                                               |
 |:-------------------------- |:------------------------------------------------------------------------- |
-| `set FAN DUTY`             | Set fixed duty of given fan (0-3) to given value (in percent)             |
+| `set FAN DUTY`             | Set fixed duty of given fan (1-4) to given value (in percent)             |
 | `status [INT]`             | Print fan and temperature sensor status (INT: interval in seconds, 0=off) |
 | `curve`                    | Start fan curve scan (output as CSV)                                      |
 | `save`                     | Save current settings to EEPROM                                           |

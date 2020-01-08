@@ -146,7 +146,7 @@ void print_status()
 {
     FOREACH_FAN(i) {
         char *pbuf = buffer;
-        pbuf += sprintf(pbuf, "fan%d: ", i);
+        pbuf += sprintf(pbuf, "Fan %d: ", i+1);
         if (fan_connected[i])
             pbuf += sprintf(pbuf, "%02d%% @ %u rpm", fan_duty[i], fan_rpm[i]);
         else
@@ -156,7 +156,7 @@ void print_status()
 
     FOREACH_TMP(i) {
         char *pbuf = buffer;
-        pbuf += sprintf(pbuf, "temp%d: ", i);
+        pbuf += sprintf(pbuf, "Temp %d: ", i+1);
         if (temp[i] != TMP_NCONN) {
             dtostrf(temp[i], 4, 2, pbuf);
             pbuf += strlen(pbuf);
@@ -210,7 +210,7 @@ void cmd_set(const char *s_fan, const char *s_duty)
     int fan = atoi(s_fan);
     int duty = atoi(s_duty);
 
-    if (fan < 0 || fan >= NUM_FAN) {
+    if (fan <= 0 || fan > NUM_FAN) {
         snprintf(buffer, SERIAL_BUFS, "Error: invalid fan no. '%d'", fan);
         Serial.println(buffer);
         return;
@@ -221,9 +221,10 @@ void cmd_set(const char *s_fan, const char *s_duty)
         return;
     }
 
-    snprintf(buffer, SERIAL_BUFS, "Setting fan %d duty %d%%", fan, duty);
+    snprintf(buffer, SERIAL_BUFS, "Setting Fan %d duty %d%%", fan, duty);
     Serial.println(buffer);
 
+    fan--;
     set_duty(fan, duty);
     opts.duty[fan] = duty;
 }
@@ -265,20 +266,20 @@ void cmd_save(const char*, const char*)
 void cmd_map(const char *s_fan, const char *s_tmp)
 {
     int fan = atoi(s_fan);
-    if (fan < 0 || fan >= NUM_FAN) {
+    if (fan <= 0 || fan > NUM_FAN) {
         sprintf(buffer, "Error: invalid fan no. '%d'", fan);
         Serial.println(buffer);
         return;
     }
 
     if (s_tmp == NULL) {
-        sprintf(buffer, "Fan %d mapped to sensor %d", fan, opts.mapping[fan]);
+        sprintf(buffer, "Fan %d mapped to sensor %d", fan, opts.mapping[fan-1]+1);
         Serial.println(buffer);
         return;
     }
 
     int tmp = atoi(s_tmp);
-    if (tmp < 0 || tmp >= NUM_TMP) {
+    if (tmp <= 0 || tmp > NUM_TMP) {
         sprintf(buffer, "Error: invalid sensor no. '%d'", tmp);
         Serial.println(buffer);
         return;
@@ -287,13 +288,21 @@ void cmd_map(const char *s_fan, const char *s_tmp)
     snprintf(buffer, SERIAL_BUFS, "Mapping fan %d to sensor %d", fan, tmp);
     Serial.println(buffer);
 
-    opts.mapping[fan] = (uint8_t)tmp;
+    opts.mapping[fan-1] = (uint8_t)tmp-1;
 }
 
 void cmd_curve(const char*, const char*)
 {
     uint16_t rpm[NUM_FAN][CURVE_SMPNUM];
 
+    // CSV header
+    char *pbuf = buffer;
+    pbuf += sprintf(pbuf, "duty,");
+    FOREACH_FAN(i)
+        pbuf += sprintf(pbuf, "fan%d,", i+1);
+    Serial.println(buffer);
+
+    // CSV data rows
     for (int duty=100; duty>=0; duty-=CURVE_STEP) {
         FOREACH_FAN(i)
             set_duty(i, duty);
@@ -310,7 +319,7 @@ void cmd_curve(const char*, const char*)
             rpm[i][0] /= CURVE_SMPNUM;
         }
 
-        char *pbuf = buffer;
+        pbuf = buffer;
         pbuf += sprintf(pbuf, "%d,", duty);
         FOREACH_FAN(i)
             pbuf += sprintf(pbuf, "%u,", rpm[i][0]);

@@ -88,7 +88,7 @@ uint8_t crc8(const uint8_t *data, uint16_t len);
  * Uses Arduino's `pulseIn()` mechanism to measure the length of the LOW-pulse
  * emitted by the Hall sensor of the fan.
  * 
- * @param    fan  Fan no. (counted by zero)
+ * @param    fan  Fan no.
  * @returns  Current fan speed in RPM
  * @note     This function can take a considerable amount of time (waiting for
  *           the next LOW pulse), avoid calling it for unconnected fans.
@@ -98,7 +98,7 @@ uint16_t get_rpm(uint8_t fan);
 /**
  * @brief Determine current sensor temperature
  * 
- * @param    sensor  Sensor no. (counted by zero)
+ * @param    sensor  Sensor no.
  * @returns  Current temperature in degrees Celsius
  */
 double get_temp(uint8_t sensor);
@@ -106,7 +106,7 @@ double get_temp(uint8_t sensor);
 /**
  * @brief Set fan duty
  * 
- * @param  fan    Fan no. (counted by zero)
+ * @param  fan    Fan no.
  * @param  value  Duty value to apply, in percent (0-100)
  */
 void set_duty(uint8_t fan, uint8_t value);
