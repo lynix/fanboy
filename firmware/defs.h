@@ -58,6 +58,11 @@
 #define EEPROM_GEN_NUM        ((EEPROM_LEN - EEPROM_GOFFS-1) / sizeof(eeprom_t))
 #define EEPROM_OPT_OFFS(GEN)  (EEPROM_GOFFS + 1 + GEN * sizeof(eeprom_t))
 
+#define S_PUTS(MSG)           Serial.println(MSG)
+#define S_EPUTS(MSG)          Serial.println("Error: " MSG)
+#define S_PRINTF(...)         snprintf(buffer, SERIAL_BUFS, __VA_ARGS__); Serial.println(buffer)
+#define S_ERROR(FMT, ...)     S_PRINTF("Error: " FMT, __VA_ARGS__)
+
 #endif
 
 /* vim: set ts=4 sw=4 et */

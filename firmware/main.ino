@@ -179,7 +179,7 @@ void handle_serial()
 
     char *command = strtok(buffer, " ");
     if (command == NULL) {
-        Serial.println("Error: no command given");
+        S_EPUTS("no command given");
         return;
     }
     char *arg1 = strtok(NULL, " ");
@@ -200,29 +200,26 @@ void handle_serial()
 void cmd_set(const char *s_fan, const char *s_duty)
 {
     if (s_fan == NULL) {
-        Serial.println("Error: no fan no. given");
+        S_EPUTS("no fan no. given");
         return;
     }
     if (s_duty == NULL) {
-        Serial.println("Error: no duty value given");
+        S_EPUTS("no duty value given");
         return;
     }
     int fan = atoi(s_fan);
     int duty = atoi(s_duty);
 
     if (fan <= 0 || fan > NUM_FAN) {
-        snprintf(buffer, SERIAL_BUFS, "Error: invalid fan no. '%d'", fan);
-        Serial.println(buffer);
+        S_ERROR("invalid fan no. '%d'", fan);
         return;
     }
     if (duty < 0 || duty > 100) {
-        snprintf(buffer, SERIAL_BUFS, "Error: invalid fan duty '%d'", duty);
-        Serial.println(buffer);
+        S_ERROR("invalid fan duty '%d'", duty);
         return;
     }
 
-    snprintf(buffer, SERIAL_BUFS, "Setting Fan %d duty %d%%", fan, duty);
-    Serial.println(buffer);
+    S_PRINTF("Setting Fan %d duty %d%%", fan, duty);
 
     fan--;
     set_duty(fan, duty);
@@ -238,13 +235,11 @@ void cmd_status(const char *s_interval, const char*)
 
     int interval = atoi(s_interval);
     if (interval < 0 || interval > UINT8_MAX) {
-        sprintf(buffer, "Error: invalid interval '%d'", interval);
-        Serial.println(buffer);
+        S_ERROR("invalid interval '%d'", interval);
         return;
     }
 
-    snprintf(buffer, SERIAL_BUFS, "Setting status interval %d", interval);
-    Serial.println(buffer);
+    S_PRINTF("Setting status interval %d", interval);
 
     opts.stats_int = (uint8_t)interval;
 }
@@ -252,41 +247,37 @@ void cmd_status(const char *s_interval, const char*)
 void cmd_load(const char *, const char*)
 {
     if (opts_load())
-        Serial.println("Settings loaded from EEPROM");
+        S_PUTS("Settings loaded from EEPROM");
     else
-        Serial.println("Failed to load settings from EEPROM!");
+        S_PUTS("Failed to load settings from EEPROM!");
 }
 
 void cmd_save(const char*, const char*)
 {
     opts_save();
-    Serial.println("Settings saved to EEPROM");
+    S_PUTS("Settings saved to EEPROM");
 }
 
 void cmd_map(const char *s_fan, const char *s_tmp)
 {
     int fan = atoi(s_fan);
     if (fan <= 0 || fan > NUM_FAN) {
-        sprintf(buffer, "Error: invalid fan no. '%d'", fan);
-        Serial.println(buffer);
+        S_ERROR("invalid fan no. '%d'", fan);
         return;
     }
 
     if (s_tmp == NULL) {
-        sprintf(buffer, "Fan %d mapped to sensor %d", fan, opts.mapping[fan-1]+1);
-        Serial.println(buffer);
+        S_PRINTF("Fan %d mapped to sensor %d", fan, opts.mapping[fan-1]+1);
         return;
     }
 
     int tmp = atoi(s_tmp);
     if (tmp <= 0 || tmp > NUM_TMP) {
-        sprintf(buffer, "Error: invalid sensor no. '%d'", tmp);
-        Serial.println(buffer);
+        S_ERROR("invalid sensor no. '%d'", tmp);
         return;
     }
 
-    snprintf(buffer, SERIAL_BUFS, "Mapping fan %d to sensor %d", fan, tmp);
-    Serial.println(buffer);
+    S_PRINTF("Mapping fan %d to sensor %d", fan, tmp);
 
     opts.mapping[fan-1] = (uint8_t)tmp-1;
 }
@@ -333,17 +324,16 @@ void cmd_curve(const char*, const char*)
 
 void cmd_help(const char*, const char*)
 {
-    Serial.println("Available commands:");
+    S_PUTS("Available commands:");
     FOREACH_U8(i, sizeof(commands) / sizeof(command_t)) {
-        Serial.print("    ");
-        Serial.println(commands[i].name);
+        S_PRINTF("    %s", commands[i].name);
     }
 }
 
 void cmd_version(const char*, const char*)
 {
-    Serial.println("Version: " VERSION);
-    Serial.println("Built:   " __DATE__ " " __TIME__);
+    S_PUTS("Version: " VERSION);
+    S_PUTS("Built:   " __DATE__ " " __TIME__);
 }
 
 
@@ -404,7 +394,7 @@ void setup()
     Serial.begin(SERIAL_BAUD);
     Serial.setTimeout(SERIAL_TIMO);
 
-    Serial.println("Initialization complete");
+    S_PUTS("Initialization complete");
 }
 
 void loop()
