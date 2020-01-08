@@ -288,9 +288,9 @@ void cmd_curve(const char*, const char*)
 
     // CSV header
     char *pbuf = buffer;
-    pbuf += sprintf(pbuf, "duty,");
+    pbuf += snprintf(pbuf, SERIAL_BUFS, "duty,");
     FOREACH_FAN(i)
-        pbuf += sprintf(pbuf, "fan%d,", i+1);
+        pbuf += snprintf(pbuf, SERIAL_BUFS-(pbuf-buffer), "fan%d,", i+1);
     Serial.println(buffer);
 
     // CSV data rows
@@ -311,9 +311,9 @@ void cmd_curve(const char*, const char*)
         }
 
         pbuf = buffer;
-        pbuf += sprintf(pbuf, "%d,", duty);
+        pbuf += snprintf(pbuf, SERIAL_BUFS, "%d,", duty);
         FOREACH_FAN(i)
-            pbuf += sprintf(pbuf, "%u,", rpm[i][0]);
+            pbuf += snprintf(pbuf, SERIAL_BUFS-(pbuf-buffer), "%u,", rpm[i][0]);
         Serial.println(buffer);
     }
 
