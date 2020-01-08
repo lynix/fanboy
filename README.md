@@ -122,15 +122,16 @@ $ echo 'set 1 75' > /dev/ttyACM0
 
 The serial interface supports the following commands:
 
-| Command        | Description                                                               |
-|:-------------- |:------------------------------------------------------------------------- |
-| `set FAN DUTY` | Set fixed duty of given fan (0-3) to given value (in percent)             |
-| `status [INT]` | Print fan and temperature sensor status (INT: interval in seconds, 0=off) |
-| `curve`        | Start fan curve scan (output as CSV)                                      |
-| `save`         | Save current settings to EEPROM                                           |
-| `load`         | Load settings from EEPROM (done automatically on power on)                |
-| `help`         | Print list of available commands                                          |
-| `version`      | Show firmware version and build information                               |
+| Command                    | Description                                                               |
+|:-------------------------- |:------------------------------------------------------------------------- |
+| `set FAN DUTY`             | Set fixed duty of given fan (0-3) to given value (in percent)             |
+| `status [INT]`             | Print fan and temperature sensor status (INT: interval in seconds, 0=off) |
+| `curve`                    | Start fan curve scan (output as CSV)                                      |
+| `save`                     | Save current settings to EEPROM                                           |
+| `load`                     | Load settings from EEPROM (done automatically on power on)                |
+| `map FAN [SENSOR]`         | Set/show fan -> sensor mapping for temperature-based fan control          |
+| `help`                     | Print list of available commands                                          |
+| `version`                  | Show firmware version and build information                               |
 
 
 ## Code

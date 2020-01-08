@@ -31,12 +31,14 @@ enum mode_t
  *
  *   mode:       Operation mode, @see mode_t
  *   duty:       Array of fixed fan duties for `MODE_MANUAL`
+ *   mapping:    Temperature sensor selection for each fan
  *   stats_int:  Interval for status output via serial
  */
 struct opts_t
 {
     mode_t     mode;
     uint8_t    duty[NUM_FAN];
+    uint8_t    mapping[NUM_FAN];
     uint8_t    stats_int;
 };
 
@@ -174,6 +176,17 @@ void cmd_save(const char *, const char *);
  * @see opts_load()
  */
 void cmd_load(const char *, const char *);
+
+/**
+ * @brief Handler for 'map' command
+ *
+ * Sets sensor no. assigned to given fan no. This is used for temperature based
+ * fan duty control. If no second argument given: show current mapping.
+ *
+ * @param[in]  s_fan   Fan no. to set/get mapping for
+ * @param[in]  s_tmp   Temperature sensor no. to assign (optional)
+ */
+void cmd_map(const char *s_fan, const char *s_tmp);
 
 /**
  * @brief Handler for 'curve' command

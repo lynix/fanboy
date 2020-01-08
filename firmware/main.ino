@@ -20,6 +20,7 @@ static const command_t commands[] = {
     { "curve",      cmd_curve },
     { "save",       cmd_save },
     { "load",       cmd_load },
+    { "map",        cmd_map },
     { "help",       cmd_help },
     { "version",    cmd_version }
 };
@@ -261,6 +262,34 @@ void cmd_save(const char*, const char*)
     Serial.println("Settings saved to EEPROM");
 }
 
+void cmd_map(const char *s_fan, const char *s_tmp)
+{
+    int fan = atoi(s_fan);
+    if (fan < 0 || fan >= NUM_FAN) {
+        sprintf(buffer, "Error: invalid fan no. '%d'", fan);
+        Serial.println(buffer);
+        return;
+    }
+
+    if (s_tmp == NULL) {
+        sprintf(buffer, "Fan %d mapped to sensor %d", fan, opts.mapping[fan]);
+        Serial.println(buffer);
+        return;
+    }
+
+    int tmp = atoi(s_tmp);
+    if (tmp < 0 || tmp >= NUM_TMP) {
+        sprintf(buffer, "Error: invalid sensor no. '%d'", tmp);
+        Serial.println(buffer);
+        return;
+    }
+
+    snprintf(buffer, SERIAL_BUFS, "Mapping fan %d to sensor %d", fan, tmp);
+    Serial.println(buffer);
+
+    opts.mapping[fan] = (uint8_t)tmp;
+}
+
 void cmd_curve(const char*, const char*)
 {
     uint16_t rpm[NUM_FAN][CURVE_SMPNUM];
@@ -355,6 +384,7 @@ void setup()
     FOREACH_FAN(i) {
         fan_rpm[i] = 0;
         opts.duty[i] = DEF_DUTY;
+        opts.mapping[i] = DEF_MAP;
         set_duty(i, fan_connected[i] ? DEF_DUTY : 0);
     }
 

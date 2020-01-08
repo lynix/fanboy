@@ -31,6 +31,7 @@
 #define DEF_MODE       MODE_MANUAL          // Default operation mode
 #define DEF_DUTY       50                   // Default fixed fan duty (%)
 #define DEF_SINT       0                    // Default status interval (s)
+#define DEF_MAP        0                    // Default sensor mapping
 
 #define SCAN_DUTY      50                   // Fan scan duty (%)
 #define SCAN_SETTLE    2000                 // Fan scan settle delay (ms)
