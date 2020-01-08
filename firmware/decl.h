@@ -30,15 +30,15 @@ enum mode_t
  * @brief Settings structure
  *
  *   mode:       Operation mode, @see mode_t
- *   duty:       Array of fixed fan duties for `MODE_MANUAL`
- *   mapping:    Temperature sensor selection for each fan
+ *   fan_duty:   Array of fixed fan duties for `MODE_MANUAL`
+ *   fan_map:    Temperature sensor selection for each fan
  *   stats_int:  Interval for status output via serial
  */
 struct opts_t
 {
     mode_t     mode;
-    uint8_t    duty[NUM_FAN];
-    uint8_t    mapping[NUM_FAN];
+    uint8_t    fan_duty[NUM_FAN];
+    uint8_t    fan_map[NUM_FAN];
     uint8_t    stats_int;
 };
 

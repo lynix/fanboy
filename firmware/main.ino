@@ -79,7 +79,7 @@ bool opts_load()
 
     opts = e.opts;
     FOREACH_FAN(i)
-        set_duty(i, opts.duty[i]);
+        set_duty(i, opts.fan_duty[i]);
 
     return true;
 }
@@ -225,7 +225,7 @@ void cmd_set(const char *s_fan, const char *s_duty)
 
     fan--;
     set_duty(fan, duty);
-    opts.duty[fan] = duty;
+    opts.fan_duty[fan] = duty;
 }
 
 void cmd_status(const char *s_interval, const char*)
@@ -269,7 +269,7 @@ void cmd_map(const char *s_fan, const char *s_tmp)
     }
 
     if (s_tmp == NULL) {
-        S_PRINTF("Fan %d mapped to sensor %d", fan, opts.mapping[fan-1]+1);
+        S_PRINTF("Fan %d mapped to sensor %d", fan, opts.fan_map[fan-1]+1);
         return;
     }
 
@@ -281,7 +281,7 @@ void cmd_map(const char *s_fan, const char *s_tmp)
 
     S_PRINTF("Mapping fan %d to sensor %d", fan, tmp);
 
-    opts.mapping[fan-1] = (uint8_t)tmp-1;
+    opts.fan_map[fan-1] = (uint8_t)tmp-1;
 }
 
 void cmd_curve(const char*, const char*)
@@ -321,7 +321,7 @@ void cmd_curve(const char*, const char*)
 
     // restore manual duty
     FOREACH_FAN(i)
-        set_duty(i, opts.duty[i]);
+        set_duty(i, opts.fan_duty[i]);
 }
 
 void cmd_help(const char*, const char*)
@@ -384,8 +384,8 @@ void setup()
     opts.stats_int = DEF_SINT;
     FOREACH_FAN(i) {
         fan_rpm[i] = 0;
-        opts.duty[i] = DEF_DUTY;
-        opts.mapping[i] = DEF_MAP;
+        opts.fan_duty[i] = DEF_DUTY;
+        opts.fan_map[i] = DEF_MAP;
         set_duty(i, fan_connected[i] ? DEF_DUTY : 0);
     }
 
