@@ -29,27 +29,37 @@ enum mode_t
 };
 
 /**
- * @brief Settings structure
+ * @brief Fan parameters structure
  *
- *   fan_mode:         Operation modes, @see mode_t
- *   fan_duty:         Array of fixed fan duties for `MODE_MANUAL`
- *   fan_map:          Temperature sensor selection for each fan
+ *   mode:             Operation mode, @see mode_t
+ *   duty:             Fixed duty for `MODE_MANUAL`
+ *   sensor:           Temperature sensor selection
  *   linear_min_temp:  Lower temperature value for linear control
  *   linear_min_duty:  Lower duty value for linear control
  *   linear_max_temp:  Upper temperature value for linear control
  *   linear_max_duty:  Upper duty value for linear control
+ */
+struct param_t
+{
+    mode_t   mode;
+    uint8_t  duty;
+    uint8_t  sensor;
+    double   linear_min_temp;
+    uint8_t  linear_min_duty;
+    double   linear_max_temp;
+    uint8_t  linear_max_duty;
+};
+
+/**
+ * @brief Settings structure
+ *
+ *   fan:        Array of control parameters, @see param_t
  *   stats_int:  Interval for status output via serial
  */
 struct opts_t
 {
-    mode_t     fan_mode[NUM_FAN];
-    uint8_t    fan_duty[NUM_FAN];
-    uint8_t    fan_map[NUM_FAN];
-    double     linear_min_temp[NUM_FAN];
-    uint8_t    linear_min_duty[NUM_FAN];
-    double     linear_max_temp[NUM_FAN];
-    uint8_t    linear_max_duty[NUM_FAN];
-    uint8_t    stats_int;
+    param_t  fan[NUM_FAN];
+    uint8_t  stats_int;
 };
 
 /**

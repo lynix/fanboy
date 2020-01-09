@@ -80,8 +80,8 @@ bool opts_load()
 
     opts = e.opts;
     FOREACH_FAN(i)
-        if (opts.fan_mode[i] == MODE_MANUAL)
-            set_duty(i, opts.fan_duty[i]);
+        if (opts.fan[i].mode == MODE_MANUAL)
+            set_duty(i, opts.fan[i].duty);
 
     return true;
 }
@@ -130,17 +130,17 @@ void set_duty(uint8_t fan, uint8_t value)
 
 void set_duty_linear(uint8_t fan)
 {
-    double t = temp[opts.fan_map[fan]];
+    double t = temp[opts.fan[fan].sensor];
 
     uint8_t duty;
-    if (t <= opts.linear_min_temp[fan])
-        duty = opts.linear_min_duty[fan];
-    else if (t >= opts.linear_max_temp[fan])
-        duty = opts.linear_max_duty[fan];
+    if (t <= opts.fan[fan].linear_min_temp)
+        duty = opts.fan[fan].linear_min_duty;
+    else if (t >= opts.fan[fan].linear_max_temp)
+        duty = opts.fan[fan].linear_max_duty;
     else
-        duty = opts.linear_min_duty[fan] + (t - opts.linear_min_temp[fan]) *
-            (opts.linear_max_duty[fan] - opts.linear_min_duty[fan]) /
-            (opts.linear_max_temp[fan] - opts.linear_min_temp[fan]);
+        duty = opts.fan[fan].linear_min_duty + (t - opts.fan[fan].linear_min_temp) *
+            (opts.fan[fan].linear_max_duty - opts.fan[fan].linear_min_duty) /
+            (opts.fan[fan].linear_max_temp - opts.fan[fan].linear_min_temp);
 
     if (fan_duty[fan] != duty)
         set_duty(fan, duty);
@@ -241,7 +241,7 @@ void cmd_set(const char *s_fan, char *s_duty)
         return;
     }
 
-    if (opts.fan_mode[fan-1] != MODE_MANUAL) {
+    if (opts.fan[fan-1].mode != MODE_MANUAL) {
         S_EPUTS("temperature-based fan control mode active");
         return;
     }
@@ -250,7 +250,7 @@ void cmd_set(const char *s_fan, char *s_duty)
 
     fan--;
     set_duty(fan, duty);
-    opts.fan_duty[fan] = duty;
+    opts.fan[fan].duty = duty;
 }
 
 void cmd_status(const char *s_interval, char*)
@@ -294,7 +294,7 @@ void cmd_map(const char *s_fan, char *s_tmp)
     }
 
     if (s_tmp == NULL) {
-        S_PRINTF("Fan %d mapped to sensor %d", fan, opts.fan_map[fan-1]+1);
+        S_PRINTF("Fan %d mapped to sensor %d", fan, opts.fan[fan-1].sensor+1);
         return;
     }
 
@@ -306,7 +306,7 @@ void cmd_map(const char *s_fan, char *s_tmp)
 
     S_PRINTF("Mapping fan %d to sensor %d", fan, tmp);
 
-    opts.fan_map[fan-1] = (uint8_t)tmp-1;
+    opts.fan[fan-1].sensor = (uint8_t)tmp-1;
 }
 
 void cmd_linear(const char *s_fan, char *s_param)
@@ -320,14 +320,14 @@ void cmd_linear(const char *s_fan, char *s_param)
 
     if (s_param == NULL) {
         char *pbuf = buffer;
-        dtostrf(opts.linear_min_temp[fan], 4, 2, pbuf);
+        dtostrf(opts.fan[fan].linear_min_temp, 4, 2, pbuf);
         pbuf += strlen(pbuf);
         pbuf += snprintf(pbuf, SERIAL_BUFS-(pbuf-buffer), ",%d,",
-            opts.linear_min_duty[fan]);
-        dtostrf(opts.linear_max_temp[fan], 4, 2, pbuf);
+            opts.fan[fan].linear_min_duty);
+        dtostrf(opts.fan[fan].linear_max_temp, 4, 2, pbuf);
         pbuf += strlen(pbuf);
         pbuf += snprintf(pbuf, SERIAL_BUFS-(pbuf-buffer), ",%d",
-            opts.linear_max_duty[fan]);
+            opts.fan[fan].linear_max_duty);
         S_PUTS(buffer);
 
         return;
@@ -351,10 +351,10 @@ void cmd_linear(const char *s_fan, char *s_param)
         return;
     }
 
-    opts.linear_min_temp[fan] = tmin;
-    opts.linear_min_duty[fan] = dmin;
-    opts.linear_max_temp[fan] = tmax;
-    opts.linear_max_duty[fan] = dmax;
+    opts.fan[fan].linear_min_temp = tmin;
+    opts.fan[fan].linear_min_duty = dmin;
+    opts.fan[fan].linear_max_temp = tmax;
+    opts.fan[fan].linear_max_duty = dmax;
 }
 
 void cmd_curve(const char*, char*)
@@ -394,8 +394,8 @@ void cmd_curve(const char*, char*)
 
     // restore manual duty
     FOREACH_FAN(i)
-        if (opts.fan_mode[i] == MODE_MANUAL)
-            set_duty(i, opts.fan_duty[i]);
+        if (opts.fan[i].mode == MODE_MANUAL)
+            set_duty(i, opts.fan[i].duty);
 }
 
 void cmd_help(const char*, char*)
@@ -457,13 +457,13 @@ void setup()
     opts.stats_int = DEF_SINT;
     FOREACH_FAN(i) {
         fan_rpm[i] = 0;
-        opts.fan_mode[i] = DEF_MODE;
-        opts.fan_duty[i] = DEF_DUTY;
-        opts.fan_map[i] = DEF_MAP;
-        opts.linear_min_temp[i] = DEF_LIN_TL;
-        opts.linear_min_duty[i] = DEF_LIN_DL;
-        opts.linear_max_temp[i] = DEF_LIN_TU;
-        opts.linear_max_duty[i] = DEF_LIN_DU;
+        opts.fan[i].mode = DEF_MODE;
+        opts.fan[i].duty = DEF_DUTY;
+        opts.fan[i].sensor = DEF_MAP;
+        opts.fan[i].linear_min_temp = DEF_LIN_TL;
+        opts.fan[i].linear_min_duty = DEF_LIN_DL;
+        opts.fan[i].linear_max_temp = DEF_LIN_TU;
+        opts.fan[i].linear_max_duty = DEF_LIN_DU;
         set_duty(i, fan_connected[i] ? DEF_DUTY : 0);
     }
 
@@ -489,7 +489,7 @@ void loop()
         FOREACH_FAN(i) {
             if (fan_connected[i]) {
                 fan_rpm[i] = get_rpm(i);
-                if (opts.fan_mode[i] == MODE_LINEAR)
+                if (opts.fan[i].mode == MODE_LINEAR)
                     set_duty_linear(i);
             }
         }
