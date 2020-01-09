@@ -25,7 +25,7 @@ your needs.
     Uses the ATmega32U4 of an Arduino Leonardo as MCU for minimal development
     overhead
 * **Multiple operation modes**  
-    Including *fixed duty*, *linear*<sup>1</sup> and *target temperature*
+    Including *fixed duty*, *linear* and *target temperature*
     <sup>1</sup>
 * **Persistent data storage**  
     Stores all settings as well as last operation mode CRC-protected in EEPROM
@@ -120,16 +120,34 @@ $ echo 'set 2 75' > /dev/ttyACM0
 
 The serial interface supports the following commands:
 
-| Command                    | Description                                                               |
-|:-------------------------- |:------------------------------------------------------------------------- |
-| `set FAN DUTY`             | Set fixed duty of given fan (1-4) to given value (in percent)             |
-| `status [INT]`             | Print fan and temperature sensor status (INT: interval in seconds, 0=off) |
-| `curve`                    | Start fan curve scan (output as CSV)                                      |
-| `save`                     | Save current settings to EEPROM                                           |
-| `load`                     | Load settings from EEPROM (done automatically on power on)                |
-| `map FAN [SENSOR]`         | Set/show fan -> sensor mapping for temperature-based fan control          |
-| `help`                     | Print list of available commands                                          |
-| `version`                  | Show firmware version and build information                               |
+| Command              | Description                                                                      |
+|:-------------------- |:-------------------------------------------------------------------------------- |
+| `set FAN DUTY`       | Set fixed duty of given fan (1-4) to given value (in percent)                    |
+| `status [INT]`       | Print fan and temperature sensor status (INT: interval in seconds, 0=off)        |
+| `curve`              | Start fan curve scan (output as CSV)                                             |
+| `save`               | Save current settings to EEPROM                                                  |
+| `load`               | Load settings from EEPROM (done automatically on power on)                       |
+| `map FAN [SENSOR]`   | Set/show fan -> sensor mapping for temperature-based fan control                 |
+| `linear FAN [PARAM]` | Set/show parameters for linear temperature-based fan control (format see below)  |
+| `help`               | Print list of available commands                                                 |
+| `version`            | Show firmware version and build information                                      |
+
+#### Linear Parameters
+
+The configuration string for linear temperature-based fan control have the form of
+
+```
+Tmin,Dmin,Tmax,Dmax
+```
+
+with
+
+| Variable | Description                      |
+|:-------- |:-------------------------------- |
+| `Tmin`   | Lower temperature                |
+| `Dmin`   | Duty value for lower temperature |
+| `Tmax`   | Upper temperature                |
+| `Dmax`   | Duty value for upper temperature |
 
 
 ## Code

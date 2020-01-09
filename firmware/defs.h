@@ -32,6 +32,10 @@
 #define DEF_DUTY       50                   // Default fixed fan duty (%)
 #define DEF_SINT       0                    // Default status interval (s)
 #define DEF_MAP        0                    // Default sensor mapping
+#define DEF_LIN_TL     20.0                 // Default linear lower temperature (°C)
+#define DEF_LIN_TU     40.0                 // Default linear upper temperature (°C)
+#define DEF_LIN_DL     33                   // Default linear lower duty (%)
+#define DEF_LIN_DU     80                   // Default linear upper duty (%)
 
 #define SCAN_DUTY      50                   // Fan scan duty (%)
 #define SCAN_SETTLE    2000                 // Fan scan settle delay (ms)

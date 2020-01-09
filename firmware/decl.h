@@ -24,16 +24,20 @@
 enum mode_t
 {
     MODE_MANUAL = 0,
-    MODE_LINEAR = 1,    // TODO: implement me
+    MODE_LINEAR = 1,
     MODE_TARGET = 2     // TODO: implement me
 };
 
 /**
  * @brief Settings structure
  *
- *   mode:       Operation mode, @see mode_t
- *   fan_duty:   Array of fixed fan duties for `MODE_MANUAL`
- *   fan_map:    Temperature sensor selection for each fan
+ *   mode:             Operation mode, @see mode_t
+ *   fan_duty:         Array of fixed fan duties for `MODE_MANUAL`
+ *   fan_map:          Temperature sensor selection for each fan
+ *   linear_min_temp:  Lower temperature value for linear control
+ *   linear_min_duty:  Lower duty value for linear control
+ *   linear_max_temp:  Upper temperature value for linear control
+ *   linear_max_duty:  Upper duty value for linear control
  *   stats_int:  Interval for status output via serial
  */
 struct opts_t
@@ -41,6 +45,10 @@ struct opts_t
     mode_t     mode;
     uint8_t    fan_duty[NUM_FAN];
     uint8_t    fan_map[NUM_FAN];
+    double     linear_min_temp[NUM_FAN];
+    uint8_t    linear_min_duty[NUM_FAN];
+    double     linear_max_temp[NUM_FAN];
+    uint8_t    linear_max_duty[NUM_FAN];
     uint8_t    stats_int;
 };
 
@@ -59,7 +67,7 @@ struct eeprom_t
 };
 
 /** Function pointer definition for command handlers **/
-typedef void (*cmd_handler_t)(const char *arg1, const char *arg2);
+typedef void (*cmd_handler_t)(const char *arg1, char *arg2);
 
 /**
  * @brief Command definition structure
@@ -114,6 +122,27 @@ double get_temp(uint8_t sensor);
 void set_duty(uint8_t fan, uint8_t value);
 
 /**
+ * @brief Set duty according linear control curve for given fan
+ *
+ *       Fan Duty
+ *          ^
+ *          |
+ *   d_max  -               ------
+ *          |              /
+ *          |             /
+ *          |            /
+ *          |           /
+ *          |          /
+ *   d_min  ----------/
+ *          |
+ *          +---------|-----|---------> Temperature
+ *                  t_min  t_max
+ *
+ * @param  fan  Fan no.
+ */
+void set_duty_linear(uint8_t fan);
+
+/**
  * @brief Save current settings to EEPROM
  */
 void opts_save();
@@ -152,7 +181,7 @@ void handle_serial();
  * @param[in]  s_fan   String containing fan no.
  * @param[in]  s_duty  String containing duty value
  */
-void cmd_set(const char *s_fan, const char *s_duty);
+void cmd_set(const char *s_fan, char *s_duty);
 
 /**
  * @brief Handler for 'status' command
@@ -163,21 +192,21 @@ void cmd_set(const char *s_fan, const char *s_duty);
  * @param[in]  s_interval  Interval for periodic status outout, in seconds
  *                         (0 = disabled)
  */
-void cmd_status(const char *s_interval, const char *);
+void cmd_status(const char *s_interval, char *);
 
 /**
  * @brief Handler for 'save' command
  * 
  * @see opts_save()
  */
-void cmd_save(const char *, const char *);
+void cmd_save(const char *, char *);
 
 /**
  * @brief Handler for 'load' command
  * 
  * @see opts_load()
  */
-void cmd_load(const char *, const char *);
+void cmd_load(const char *, char *);
 
 /**
  * @brief Handler for 'map' command
@@ -188,30 +217,38 @@ void cmd_load(const char *, const char *);
  * @param[in]  s_fan   Fan no. to set/get mapping for
  * @param[in]  s_tmp   Temperature sensor no. to assign (optional)
  */
-void cmd_map(const char *s_fan, const char *s_tmp);
+void cmd_map(const char *s_fan, char *s_tmp);
 
 /**
- * @brief Handler for 'curve' command
- * 
- * Determines fan characteristic by ramping duty values from 100% down to 0%
- * in `CURVE_STEP`% steps, taking `CURVE_SAMPLE_NUM` samples of the fan RPM.
- * Prints summary as CSV with duty value as rows and fan RPM as columns.
+ * @brief Handler for 'linear' command
+ *
+ * Sets parameters for linear temperature control for given fan. If no second
+ * argument is given: show current configuration.
+ *
+ * @param[in]  s_fan     Fan no. to set/get parameters for
+ * @param[in]  s_param   String of the form 'Tmin,Dmin,Tmax,Dmax' (optional)
+ *                       with 'Tmin'/'Tmax' as lower/upper temperatures and
+ *                       'Dmin'/'Dmax' as lower/upper duty values
  */
-void cmd_curve(const char *, const char *);
+void cmd_linear(const char *s_fan, char *s_param);
+
+/**tmins rows and fan RPM as columns.
+ */
+void cmd_curve(const char *, char *);
 
 /**
  * @brief Handler for 'help' command
  * 
  * Prints all available commands.
  */
-void cmd_help(const char *, const char *);
+void cmd_help(const char *, char *);
 
 /**
  * @brief Handler for 'version' command
  * 
  * Prints firmware version and build timestamp.
  */
-void cmd_version(const char *, const char *);
+void cmd_version(const char *, char *);
 
 #endif
 

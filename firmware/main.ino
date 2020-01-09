@@ -21,6 +21,7 @@ static const command_t commands[] = {
     { "save",       cmd_save },
     { "load",       cmd_load },
     { "map",        cmd_map },
+    { "linear",     cmd_linear },
     { "help",       cmd_help },
     { "version",    cmd_version }
 };
@@ -78,8 +79,9 @@ bool opts_load()
         return false;
 
     opts = e.opts;
-    FOREACH_FAN(i)
-        set_duty(i, opts.fan_duty[i]);
+    if (opts.mode == MODE_MANUAL)
+        FOREACH_FAN(i)
+            set_duty(i, opts.fan_duty[i]);
 
     return true;
 }
@@ -124,6 +126,24 @@ void set_duty(uint8_t fan, uint8_t value)
         case 2: OCR3A = duty; break;
         case 3: OCR1B = duty; break;
     }
+}
+
+void set_duty_linear(uint8_t fan)
+{
+    double t = temp[opts.fan_map[fan]];
+
+    uint8_t duty;
+    if (t <= opts.linear_min_temp[fan])
+        duty = opts.linear_min_duty[fan];
+    else if (t >= opts.linear_max_temp[fan])
+        duty = opts.linear_max_duty[fan];
+    else
+        duty = opts.linear_min_duty[fan] + (t - opts.linear_min_temp[fan]) *
+            (opts.linear_max_duty[fan] - opts.linear_min_duty[fan]) /
+            (opts.linear_max_temp[fan] - opts.linear_min_temp[fan]);
+
+    if (fan_duty[fan] != duty)
+        set_duty(fan, duty);
 }
 
 void fan_scan()
@@ -199,7 +219,7 @@ void handle_serial()
     Serial.println("'");
 }
 
-void cmd_set(const char *s_fan, const char *s_duty)
+void cmd_set(const char *s_fan, char *s_duty)
 {
     if (s_fan == NULL) {
         S_EPUTS("no fan no. given");
@@ -221,6 +241,11 @@ void cmd_set(const char *s_fan, const char *s_duty)
         return;
     }
 
+    if (opts.mode != MODE_MANUAL) {
+        S_EPUTS("temperature-based fan control mode active");
+        return;
+    }
+
     S_PRINTF("Setting Fan %d duty %d%%", fan, duty);
 
     fan--;
@@ -228,7 +253,7 @@ void cmd_set(const char *s_fan, const char *s_duty)
     opts.fan_duty[fan] = duty;
 }
 
-void cmd_status(const char *s_interval, const char*)
+void cmd_status(const char *s_interval, char*)
 {
     if (s_interval == NULL) {
         print_status();
@@ -246,7 +271,7 @@ void cmd_status(const char *s_interval, const char*)
     opts.stats_int = (uint8_t)interval;
 }
 
-void cmd_load(const char *, const char*)
+void cmd_load(const char *, char*)
 {
     if (opts_load())
         S_PUTS("Settings loaded from EEPROM");
@@ -254,13 +279,13 @@ void cmd_load(const char *, const char*)
         S_PUTS("Failed to load settings from EEPROM!");
 }
 
-void cmd_save(const char*, const char*)
+void cmd_save(const char*, char*)
 {
     opts_save();
     S_PUTS("Settings saved to EEPROM");
 }
 
-void cmd_map(const char *s_fan, const char *s_tmp)
+void cmd_map(const char *s_fan, char *s_tmp)
 {
     int fan = atoi(s_fan);
     if (fan <= 0 || fan > NUM_FAN) {
@@ -284,7 +309,55 @@ void cmd_map(const char *s_fan, const char *s_tmp)
     opts.fan_map[fan-1] = (uint8_t)tmp-1;
 }
 
-void cmd_curve(const char*, const char*)
+void cmd_linear(const char *s_fan, char *s_param)
+{
+    int fan = atoi(s_fan);
+    if (fan <= 0 || fan > NUM_FAN) {
+        S_ERROR("invalid fan no. '%d'", fan);
+        return;
+    }
+    fan--;
+
+    if (s_param == NULL) {
+        char *pbuf = buffer;
+        dtostrf(opts.linear_min_temp[fan], 4, 2, pbuf);
+        pbuf += strlen(pbuf);
+        pbuf += snprintf(pbuf, SERIAL_BUFS-(pbuf-buffer), ",%d,",
+            opts.linear_min_duty[fan]);
+        dtostrf(opts.linear_max_temp[fan], 4, 2, pbuf);
+        pbuf += strlen(pbuf);
+        pbuf += snprintf(pbuf, SERIAL_BUFS-(pbuf-buffer), ",%d",
+            opts.linear_max_duty[fan]);
+        S_PUTS(buffer);
+
+        return;
+    }
+
+    char *s_tmin = strtok(s_param, ",");
+    char *s_dmin = strtok(NULL, ",");
+    char *s_tmax = strtok(NULL, ",");
+    char *s_dmax = strtok(NULL, ",");
+    if (!(s_tmin && s_dmin && s_tmax && s_dmax)) {
+        S_EPUTS("invalid parameter string");
+        return;
+    }
+
+    double tmin = atof(s_tmin);
+    double tmax = atof(s_tmax);
+    int dmin = atoi(s_dmin);
+    int dmax = atoi(s_dmax);
+    if (dmin < 0 || dmin > 100 || dmax < 0 || dmax > 100) {
+        S_EPUTS("invalid duty value(s)");
+        return;
+    }
+
+    opts.linear_min_temp[fan] = tmin;
+    opts.linear_min_duty[fan] = dmin;
+    opts.linear_max_temp[fan] = tmax;
+    opts.linear_max_duty[fan] = dmax;
+}
+
+void cmd_curve(const char*, char*)
 {
     uint16_t rpm[NUM_FAN][CURVE_SMPNUM];
 
@@ -320,11 +393,12 @@ void cmd_curve(const char*, const char*)
     }
 
     // restore manual duty
-    FOREACH_FAN(i)
-        set_duty(i, opts.fan_duty[i]);
+    if (opts.mode == MODE_MANUAL)
+        FOREACH_FAN(i)
+            set_duty(i, opts.fan_duty[i]);
 }
 
-void cmd_help(const char*, const char*)
+void cmd_help(const char*, char*)
 {
     S_PUTS("Available commands:");
     FOREACH_U8(i, sizeof(commands) / sizeof(command_t)) {
@@ -332,7 +406,7 @@ void cmd_help(const char*, const char*)
     }
 }
 
-void cmd_version(const char*, const char*)
+void cmd_version(const char*, char*)
 {
     S_PUTS("Version: " VERSION);
     S_PUTS("Built:   " __DATE__ " " __TIME__);
@@ -386,6 +460,10 @@ void setup()
         fan_rpm[i] = 0;
         opts.fan_duty[i] = DEF_DUTY;
         opts.fan_map[i] = DEF_MAP;
+        opts.linear_min_temp[i] = DEF_LIN_TL;
+        opts.linear_min_duty[i] = DEF_LIN_DL;
+        opts.linear_max_temp[i] = DEF_LIN_TU;
+        opts.linear_max_duty[i] = DEF_LIN_DU;
         set_duty(i, fan_connected[i] ? DEF_DUTY : 0);
     }
 
@@ -411,6 +489,9 @@ void loop()
                 fan_rpm[i] = get_rpm(i);
         FOREACH_TMP(i)
             temp[i] = get_temp(i);
+        if (opts.mode == MODE_LINEAR)
+            FOREACH_FAN(i)
+                set_duty_linear(i);
     }
 
     static uint32_t status_next = 0;
