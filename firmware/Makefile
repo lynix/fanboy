@@ -4,7 +4,7 @@
 # the MIT License, see file 'LICENSE'.
 
 BOARD_TAG = leonardo
-ARDUINO_PORT = /dev/ttyACM0
+ARDUINO_PORT ?= /dev/ttyACM0
 MONITOR_BAUDRATE = 57600
 
 ARDUINO_QUIET = 1
