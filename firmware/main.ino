@@ -151,7 +151,7 @@ void print_status()
             pbuf += sprintf(pbuf, "%02d%% @ %u rpm", fan_duty[i], fan_rpm[i]);
         else
             pbuf += sprintf(pbuf, "disconnected");
-        Serial.println(buffer);
+        S_PUTS(buffer);
     }
 
     FOREACH_TMP(i) {
@@ -164,7 +164,7 @@ void print_status()
         } else {
             pbuf += sprintf(pbuf, "disconnected");
         }
-        Serial.println(buffer);
+        S_PUTS(buffer);
     }
 }
 
