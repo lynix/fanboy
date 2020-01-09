@@ -9,6 +9,8 @@
 
 #include <stdint.h>
 
+#include "defs.h"
+
 
 /**
  * @brief Operation mode
