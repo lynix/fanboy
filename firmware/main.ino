@@ -79,8 +79,8 @@ bool opts_load()
         return false;
 
     opts = e.opts;
-    if (opts.mode == MODE_MANUAL)
-        FOREACH_FAN(i)
+    FOREACH_FAN(i)
+        if (opts.fan_mode[i] == MODE_MANUAL)
             set_duty(i, opts.fan_duty[i]);
 
     return true;
@@ -241,7 +241,7 @@ void cmd_set(const char *s_fan, char *s_duty)
         return;
     }
 
-    if (opts.mode != MODE_MANUAL) {
+    if (opts.fan_mode[fan-1] != MODE_MANUAL) {
         S_EPUTS("temperature-based fan control mode active");
         return;
     }
@@ -393,8 +393,8 @@ void cmd_curve(const char*, char*)
     }
 
     // restore manual duty
-    if (opts.mode == MODE_MANUAL)
-        FOREACH_FAN(i)
+    FOREACH_FAN(i)
+        if (opts.fan_mode[i] == MODE_MANUAL)
             set_duty(i, opts.fan_duty[i]);
 }
 
@@ -454,10 +454,10 @@ void setup()
     fan_scan();
 
     // initialize defaults
-    opts.mode = DEF_MODE;
     opts.stats_int = DEF_SINT;
     FOREACH_FAN(i) {
         fan_rpm[i] = 0;
+        opts.fan_mode[i] = DEF_MODE;
         opts.fan_duty[i] = DEF_DUTY;
         opts.fan_map[i] = DEF_MAP;
         opts.linear_min_temp[i] = DEF_LIN_TL;
@@ -484,14 +484,15 @@ void loop()
     static uint32_t measure_next = 0;
     if (now > measure_next) {
         measure_next = now + UPDATE_INT;
-        FOREACH_FAN(i)
-            if (fan_connected[i])
-                fan_rpm[i] = get_rpm(i);
         FOREACH_TMP(i)
             temp[i] = get_temp(i);
-        if (opts.mode == MODE_LINEAR)
-            FOREACH_FAN(i)
-                set_duty_linear(i);
+        FOREACH_FAN(i) {
+            if (fan_connected[i]) {
+                fan_rpm[i] = get_rpm(i);
+                if (opts.fan_mode[i] == MODE_LINEAR)
+                    set_duty_linear(i);
+            }
+        }
     }
 
     static uint32_t status_next = 0;

@@ -17,7 +17,7 @@
  *
  * Operation mode abstraction. May be one of:
  *
- *   MODE_MANUAL:  Fan duty cycles set to fixed value
+ *   MODE_MANUAL:  Fan duty cycle set to fixed value
  *   MODE_LINEAR:  Linear curve between two points, flat-out
  *   MODE_TARGET:  Target temperature for PID-controlled fan duty
  */
@@ -31,7 +31,7 @@ enum mode_t
 /**
  * @brief Settings structure
  *
- *   mode:             Operation mode, @see mode_t
+ *   fan_mode:         Operation modes, @see mode_t
  *   fan_duty:         Array of fixed fan duties for `MODE_MANUAL`
  *   fan_map:          Temperature sensor selection for each fan
  *   linear_min_temp:  Lower temperature value for linear control
@@ -42,7 +42,7 @@ enum mode_t
  */
 struct opts_t
 {
-    mode_t     mode;
+    mode_t     fan_mode[NUM_FAN];
     uint8_t    fan_duty[NUM_FAN];
     uint8_t    fan_map[NUM_FAN];
     double     linear_min_temp[NUM_FAN];

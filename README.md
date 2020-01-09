@@ -24,8 +24,8 @@ your needs.
 * **Based on well-known Arduino platform**  
     Uses the ATmega32U4 of an Arduino Leonardo as MCU for minimal development
     overhead
-* **Multiple operation modes**  
-    Including *fixed duty*, *linear* and *target temperature*
+* **Multiple operation modes per channel**  
+    including *fixed duty*, *linear* and *target temperature*
     <sup>1</sup>
 * **Persistent data storage**  
     Stores all settings as well as last operation mode CRC-protected in EEPROM
