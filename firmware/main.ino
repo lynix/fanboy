@@ -191,7 +191,7 @@ void print_status()
         if (temp[i] != TMP_NCONN) {
             dtostrf(temp[i], 4, 2, pbuf);
             pbuf += strlen(pbuf);
-            pbuf += sprintf(pbuf, " °C");
+            pbuf += sprintf(pbuf, " C");
         } else {
             pbuf += sprintf(pbuf, "disconnected");
         }
