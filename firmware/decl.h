@@ -205,6 +205,17 @@ void cmd_set(const char *s_fan, char *s_duty);
 void cmd_status(const char *s_interval, char *);
 
 /**
+ * @brief Handler for 'mode' command
+ *
+ * Sets operation mode for given fan. Prints current operation mode if second
+ * argument is omitted.
+ *
+ * @param[in]  s_fan   Fan no. to set/get mapping for
+ * @param[in]  s_mode  Operation mode to set (optional)
+ */
+void cmd_mode(const char *s_fan, char *s_mode);
+
+/**
  * @brief Handler for 'save' command
  * 
  * @see opts_save()

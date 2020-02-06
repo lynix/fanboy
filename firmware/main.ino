@@ -14,9 +14,12 @@ static const uint8_t pins_pwm[NUM_FAN] = PINS_PWM;
 static const uint8_t pins_rpm[NUM_FAN] = PINS_RPM;
 static const uint8_t pins_tmp[NUM_TMP] = PINS_TMP;
 
+static const char *modestr[] = { "manual", "linear", "target" };
+
 static const command_t commands[] = {
     { "set",        cmd_set },
     { "status",     cmd_status },
+    { "mode",       cmd_mode },
     { "curve",      cmd_curve },
     { "save",       cmd_save },
     { "load",       cmd_load },
@@ -261,6 +264,7 @@ void cmd_set(const char *s_fan, char *s_duty)
 
     fan--;
     set_duty(fan, duty);
+    opts.fan[fan].mode = MODE_MANUAL;
     opts.fan[fan].duty = duty;
 }
 
@@ -280,6 +284,31 @@ void cmd_status(const char *s_interval, char*)
     S_PRINTF("Setting status interval %d", interval);
 
     opts.stats_int = (uint8_t)interval;
+}
+
+void cmd_mode(const char *s_fan, char *s_mode)
+{
+    int fan = atoi(s_fan);
+    if (fan <= 0 || fan > NUM_FAN) {
+        S_ERROR("invalid fan no. '%d'", fan);
+        return;
+    }
+    fan--;
+
+    if (s_mode == NULL) {
+        S_PRINTF("Fan %d set to mode '%s'", fan+1, modestr[opts.fan[fan].mode]);
+        return;
+    }
+
+    FOREACH_U8(i, sizeof(modestr) / sizeof(char *)) {
+        if (strcmp(s_mode, modestr[i]) == 0) {
+            S_PRINTF("Setting fan %d mode '%s'", fan+1, modestr[i]);
+            opts.fan[fan].mode = (mode_t)i;
+            return;
+        }
+    }
+
+    S_EPUTS("invalid fan mode");
 }
 
 void cmd_load(const char *, char*)

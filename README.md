@@ -124,6 +124,7 @@ The serial interface supports the following commands:
 |:-------------------- |:-------------------------------------------------------------------------------- |
 | `set FAN DUTY`       | Set fixed duty of given fan (1-4) to given value (in percent)                    |
 | `status [INT]`       | Print fan and temperature sensor status (INT: interval in seconds, 0=off)        |
+| `mode FAN [MODE]`    | Set/show operation mode of given fan (MODE: `manual` or `linear`)                |
 | `curve`              | Start fan curve scan (output as CSV)                                             |
 | `save`               | Save current settings to EEPROM                                                  |
 | `load`               | Load settings from EEPROM (done automatically on power on)                       |
