@@ -88,9 +88,20 @@ bool opts_load()
 
 uint16_t get_rpm(uint8_t fan)
 {
-    uint32_t time = pulseIn(pins_rpm[fan], LOW, RPM_TIMEOUT);
+    uint16_t rpm = 0;
 
-    return time ? (60UL * 1000UL * 1000UL / 4UL) / time : 0;
+    FOREACH_U8(i, RPM_SNUM) {
+        uint32_t time;
+        FOREACH_U8(n, RPM_RETRIES) {
+            time = pulseIn(pins_rpm[fan], LOW, RPM_TIMEOUT);
+            if (time >= RPM_TMIN || fan_duty[fan] == 0)
+                break;
+        }
+        if (time >= RPM_TMIN)
+            rpm += 15000000UL / time;
+    }
+
+    return rpm / RPM_SNUM;
 }
 
 double get_temp(uint8_t sensor)

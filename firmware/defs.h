@@ -27,6 +27,9 @@
 #define TMP_NCONN      -273.15              // Sensor reading while unconnected
 
 #define RPM_TIMEOUT    500000               // RPM pulse detection timeout (us)
+#define RPM_TMIN       3000                 // Minimum RPM pulse length regarded valid (us)
+#define RPM_SNUM       2                    // No. of samples for RPM measurement
+#define RPM_RETRIES    2                    // No. of retries for RPM measurement
 
 #define DEF_MODE       MODE_MANUAL          // Default operation mode
 #define DEF_DUTY       50                   // Default fixed fan duty (%)
