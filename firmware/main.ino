@@ -260,7 +260,7 @@ void cmd_set(const char *s_fan, char *s_duty)
         return;
     }
 
-    S_PRINTF("Setting Fan %d duty %d%%", fan, duty);
+    S_PRINTF("Setting fan %d duty %d%%", fan, duty);
 
     fan--;
     set_duty(fan, duty);
