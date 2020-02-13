@@ -360,6 +360,8 @@ void cmd_linear(const char *s_fan, char *s_param)
 
     if (s_param == NULL) {
         char *pbuf = buffer;
+        pbuf += snprintf(pbuf, SERIAL_BUFS-(pbuf-buffer),
+            "Fan %d linear params ", fan+1);
         dtostrf(opts.fan[fan].linear_min_temp, 4, 2, pbuf);
         pbuf += strlen(pbuf);
         pbuf += snprintf(pbuf, SERIAL_BUFS-(pbuf-buffer), ",%d,",
