@@ -333,20 +333,16 @@ void cmd_map(const char *s_fan, char *s_tmp)
         return;
     }
 
-    if (s_tmp == NULL) {
-        S_PRINTF("Fan %d mapped to sensor %d", fan, opts.fan[fan-1].sensor+1);
-        return;
+    if (s_tmp != NULL) {
+        int tmp = atoi(s_tmp);
+        if (tmp <= 0 || tmp > NUM_TMP) {
+            S_ERROR("invalid sensor no. '%d'", tmp);
+            return;
+        }
+        opts.fan[fan-1].sensor = (uint8_t)tmp-1;
     }
 
-    int tmp = atoi(s_tmp);
-    if (tmp <= 0 || tmp > NUM_TMP) {
-        S_ERROR("invalid sensor no. '%d'", tmp);
-        return;
-    }
-
-    S_PRINTF("Mapping fan %d to sensor %d", fan, tmp);
-
-    opts.fan[fan-1].sensor = (uint8_t)tmp-1;
+    S_PRINTF("Fan %d mapped to sensor %d", fan, opts.fan[fan-1].sensor+1);
 }
 
 void cmd_linear(const char *s_fan, char *s_param)
