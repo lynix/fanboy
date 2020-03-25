@@ -354,45 +354,43 @@ void cmd_linear(const char *s_fan, char *s_param)
     }
     fan--;
 
-    if (s_param == NULL) {
-        char *pbuf = buffer;
-        pbuf += snprintf(pbuf, SERIAL_BUFS-(pbuf-buffer),
-            "Fan %d linear params ", fan+1);
-        dtostrf(opts.fan[fan].linear_min_temp, 4, 2, pbuf);
-        pbuf += strlen(pbuf);
-        pbuf += snprintf(pbuf, SERIAL_BUFS-(pbuf-buffer), ",%d,",
-            opts.fan[fan].linear_min_duty);
-        dtostrf(opts.fan[fan].linear_max_temp, 4, 2, pbuf);
-        pbuf += strlen(pbuf);
-        pbuf += snprintf(pbuf, SERIAL_BUFS-(pbuf-buffer), ",%d",
-            opts.fan[fan].linear_max_duty);
-        S_PUTS(buffer);
+    if (s_param != NULL) {
+        char *s_tmin = strtok(s_param, ",");
+        char *s_dmin = strtok(NULL, ",");
+        char *s_tmax = strtok(NULL, ",");
+        char *s_dmax = strtok(NULL, ",");
+        if (!(s_tmin && s_dmin && s_tmax && s_dmax)) {
+            S_EPUTS("invalid parameter string");
+            return;
+        }
 
-        return;
+        double tmin = atof(s_tmin);
+        double tmax = atof(s_tmax);
+        int dmin = atoi(s_dmin);
+        int dmax = atoi(s_dmax);
+        if (dmin < 0 || dmin > 100 || dmax < 0 || dmax > 100) {
+            S_EPUTS("invalid duty value(s)");
+            return;
+        }
+
+        opts.fan[fan].linear_min_temp = tmin;
+        opts.fan[fan].linear_min_duty = dmin;
+        opts.fan[fan].linear_max_temp = tmax;
+        opts.fan[fan].linear_max_duty = dmax;
     }
 
-    char *s_tmin = strtok(s_param, ",");
-    char *s_dmin = strtok(NULL, ",");
-    char *s_tmax = strtok(NULL, ",");
-    char *s_dmax = strtok(NULL, ",");
-    if (!(s_tmin && s_dmin && s_tmax && s_dmax)) {
-        S_EPUTS("invalid parameter string");
-        return;
-    }
-
-    double tmin = atof(s_tmin);
-    double tmax = atof(s_tmax);
-    int dmin = atoi(s_dmin);
-    int dmax = atoi(s_dmax);
-    if (dmin < 0 || dmin > 100 || dmax < 0 || dmax > 100) {
-        S_EPUTS("invalid duty value(s)");
-        return;
-    }
-
-    opts.fan[fan].linear_min_temp = tmin;
-    opts.fan[fan].linear_min_duty = dmin;
-    opts.fan[fan].linear_max_temp = tmax;
-    opts.fan[fan].linear_max_duty = dmax;
+    char *pbuf = buffer;
+    pbuf += snprintf(pbuf, SERIAL_BUFS-(pbuf-buffer),
+        "Fan %d linear params ", fan+1);
+    dtostrf(opts.fan[fan].linear_min_temp, 4, 2, pbuf);
+    pbuf += strlen(pbuf);
+    pbuf += snprintf(pbuf, SERIAL_BUFS-(pbuf-buffer), ",%d,",
+        opts.fan[fan].linear_min_duty);
+    dtostrf(opts.fan[fan].linear_max_temp, 4, 2, pbuf);
+    pbuf += strlen(pbuf);
+    pbuf += snprintf(pbuf, SERIAL_BUFS-(pbuf-buffer), ",%d",
+        opts.fan[fan].linear_max_duty);
+    S_PUTS(buffer);
 }
 
 void cmd_curve(const char*, char*)
