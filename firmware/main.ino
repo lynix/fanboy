@@ -5,6 +5,7 @@
  */
 
 #include <EEPROM.h>
+#include <avr/wdt.h>
 
 #include "defs.h"
 #include "decl.h"
@@ -25,6 +26,7 @@ static const command_t commands[] = {
     { "load",       cmd_load },
     { "map",        cmd_map },
     { "linear",     cmd_linear },
+    { "reset",      cmd_reset },
     { "help",       cmd_help },
     { "version",    cmd_version }
 };
@@ -432,6 +434,12 @@ void cmd_curve(const char*, char*)
     FOREACH_FAN(i)
         if (opts.fan[i].mode == MODE_MANUAL)
             set_duty(i, opts.fan[i].duty);
+}
+
+void cmd_reset(const char*, char*)
+{
+    wdt_enable(50);
+    while (true) {};
 }
 
 void cmd_help(const char*, char*)

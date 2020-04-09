@@ -263,6 +263,11 @@ void cmd_linear(const char *s_fan, char *s_param);
 void cmd_curve(const char *, char *);
 
 /**
+ * @brief Re-initializes the device
+ */
+ void cmd_reset(const char *, char *);
+
+/**
  * @brief Handler for 'help' command
  * 
  * Prints all available commands.

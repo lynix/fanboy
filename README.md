@@ -130,6 +130,7 @@ The serial interface supports the following commands:
 | `load`               | Load settings from EEPROM (done automatically on power on)                       |
 | `map FAN [SENSOR]`   | Set/show fan -> sensor mapping for temperature-based fan control                 |
 | `linear FAN [PARAM]` | Set/show parameters for linear temperature-based fan control (format see below)  |
+| `reset`              | Re-initializes the device                                                        |
 | `help`               | Print list of available commands                                                 |
 | `version`            | Show firmware version and build information                                      |
 
