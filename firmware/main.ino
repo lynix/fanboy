@@ -9,6 +9,7 @@
 
 #include "defs.h"
 #include "decl.h"
+#include "commands.h"
 
 
 static const uint8_t pins_pwm[NUM_FAN] = PINS_PWM;
@@ -18,17 +19,17 @@ static const uint8_t pins_tmp[NUM_TMP] = PINS_TMP;
 static const char *modestr[] = { "manual", "linear", "target" };
 
 static const command_t commands[] = {
-    { "set",        cmd_set },
-    { "status",     cmd_status },
-    { "mode",       cmd_mode },
-    { "curve",      cmd_curve },
-    { "save",       cmd_save },
-    { "load",       cmd_load },
-    { "map",        cmd_map },
-    { "linear",     cmd_linear },
-    { "reset",      cmd_reset },
-    { "help",       cmd_help },
-    { "version",    cmd_version }
+    { CMD_SET,     cmd_set },
+    { CMD_STATUS,  cmd_status },
+    { CMD_MODE,    cmd_mode },
+    { CMD_CURVE,   cmd_curve },
+    { CMD_SAVE,    cmd_save },
+    { CMD_LOAD,    cmd_load },
+    { CMD_MAP,     cmd_map },
+    { CMD_LINEAR,  cmd_linear },
+    { CMD_RESET,   cmd_reset },
+    { CMD_HELP,    cmd_help },
+    { CMD_VERSION, cmd_version }
 };
 
 static opts_t      opts;
