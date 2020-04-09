@@ -253,7 +253,12 @@ void cmd_map(const char *s_fan, char *s_tmp);
  */
 void cmd_linear(const char *s_fan, char *s_param);
 
-/**tmins rows and fan RPM as columns.
+/**
+ * @brief Handler for 'curve' command
+ *
+ * Determines fan characteristic by ramping duty values from 100% down to 0%
+ * in `CURVE_STEP`% steps, taking `CURVE_SAMPLE_NUM` samples of the fan RPM.
+ * Prints summary as CSV with duty value as rows and fan RPM as columns.
  */
 void cmd_curve(const char *, char *);
 
