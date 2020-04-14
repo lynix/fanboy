@@ -1,16 +1,16 @@
-# Copyright (c) 2019 Alexander Koch
+# Copyright (c) 2020 Alexander Koch
 #
-# This file is part of a project that is distributed under the terms of
-# the MIT License, see file 'LICENSE'.
+# This file is part of a project that is distributed under the terms of the MIT
+# License, see file 'LICENSE'.
 
-BOARD_TAG = leonardo
-ARDUINO_PORT ?= /dev/ttyACM0
-MONITOR_BAUDRATE = 57600
+BOARD_TAG          = leonardo
+ARDUINO_PORT      ?= /dev/ttyACM0
+MONITOR_BAUDRATE   = 57600
 
-ARDUINO_QUIET = 1
+ARDUINO_QUIET      = 1
 OPTIMIZATION_LEVEL = 3
-OBJDIR = build
-CXXFLAGS = -Wno-deprecated-declarations
+OBJDIR             = build
+CXXFLAGS           = -Wno-deprecated-declarations
 
 OS := $(shell egrep '^ID=' /etc/os-release 2>/dev/null | cut -d '=' -f 2)
 ifeq ($(OS), arch)

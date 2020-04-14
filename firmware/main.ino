@@ -1,44 +1,113 @@
-/* Copyright (c) 2019 Alexander Koch
+/* Copyright (c) 2020 Alexander Koch
  *
- * This file is part of a project that is distributed under the terms of
- * the MIT License, see file 'LICENSE'.
+ * This file is part of a project that is distributed under the terms of the MIT
+ * License, see file 'LICENSE'.
  */
 
 #include <EEPROM.h>
 #include <avr/wdt.h>
 
-#include "defs.h"
+#include "config.h"
+#include "serial.h"
 #include "decl.h"
-#include "commands.h"
-
 
 static const uint8_t pins_pwm[NUM_FAN] = PINS_PWM;
 static const uint8_t pins_rpm[NUM_FAN] = PINS_RPM;
-static const uint8_t pins_tmp[NUM_TMP] = PINS_TMP;
+static const uint8_t pins_tmp[NUM_TEMP] = PINS_TMP;
 
-static const char *modestr[] = { "manual", "linear", "target" };
-
-static const command_t commands[] = {
-    { CMD_SET,     cmd_set },
-    { CMD_STATUS,  cmd_status },
-    { CMD_MODE,    cmd_mode },
-    { CMD_CURVE,   cmd_curve },
-    { CMD_SAVE,    cmd_save },
-    { CMD_LOAD,    cmd_load },
-    { CMD_MAP,     cmd_map },
-    { CMD_LINEAR,  cmd_linear },
-    { CMD_RESET,   cmd_reset },
-    { CMD_HELP,    cmd_help },
-    { CMD_VERSION, cmd_version }
-};
-
-static opts_t      opts;
-static bool        fan_connected[NUM_FAN];
-static uint8_t     fan_duty[NUM_FAN];
-static uint16_t    fan_rpm[NUM_FAN];
-static double      temp[NUM_TMP];
+static config_t    opts;
+static status_t    status;
+static version_t   version;
 static char        buffer[SERIAL_BUFS];
 
+
+void setup()
+{
+    // I/O pins
+    FOREACH_FAN(i) {
+        pinMode(pins_pwm[i], OUTPUT);
+        pinMode(pins_rpm[i], INPUT);
+    }
+    FOREACH_TEMP(i)
+        pinMode(pins_tmp[i], INPUT);
+
+    // setup timer1 for 25 kHz PWM
+    TCCR1A = 0;
+    TCCR1B = 0;
+    TCCR1C = 0;
+    TCNT1  = 0;
+    TCCR1A = _BV(COM1A1) | _BV(COM1B1) | _BV(COM1C1) | _BV(WGM11);
+    TCCR1B = _BV(WGM13) | _BV(CS10);
+    TCCR1C = _BV(WGM13) | _BV(CS10);
+    ICR1   = TIMER13_TOP;
+
+    // setup timer3 for 25 kHz PWM
+    TCCR3A = 0;
+    TCNT3  = 0;
+    TCCR3A = _BV(COM1A1) | _BV(WGM11);
+    TCCR3B = _BV(WGM13) | _BV(CS10);
+    ICR3   = TIMER13_TOP;
+
+    // setup timer4 for ~25 kHz PWM (close enough)
+    TCCR4A = 0;
+    TCCR4B = 4;
+    TCCR4C = 0;
+    TCCR4D = 0;
+    PLLFRQ = (PLLFRQ & 0xCF) | 0x30;
+    OCR4C  = TIMER4_TOP;
+    DDRD   |= 1<<7;
+    TCCR4C |= 0x09;
+
+    // prepare firmware version record
+    memset(version.version, 0, STRL);
+    strncpy(version.version, VERSION, STRL-1);
+    memset(version.build, 0, STRL);
+    strncpy(version.build, BUILD, STRL-1);
+
+    // scan connected fans
+    fan_scan();
+
+    // default configuration
+    FOREACH_FAN(i) {
+        opts.temp_unit = DEF_UNIT;
+        opts.fan[i].mode = DEF_MODE;
+        opts.fan[i].duty = DEF_DUTY;
+        opts.fan[i].sensor = DEF_MAP;
+        opts.fan[i].param.min_temp = DEF_LIN_TL;
+        opts.fan[i].param.min_duty = DEF_LIN_DL;
+        opts.fan[i].param.max_temp = DEF_LIN_TU;
+        opts.fan[i].param.max_duty = DEF_LIN_DU;
+    }
+
+    // load configuration from EEPROM
+    opts_load();
+
+    // serial
+    Serial.begin(SERIAL_BAUD);
+    Serial.setTimeout(SERIAL_TIMO);
+}
+
+void loop()
+{
+    uint32_t now = millis();
+
+    static uint32_t measure_next = 0;
+    if (now > measure_next) {
+        measure_next = now + UPDATE_INT;
+        FOREACH_TEMP(i)
+            status.temp[i] = get_temp(i);
+        FOREACH_FAN(i) {
+            if (status.fan[i].rpm != NCONN) {
+                status.fan[i].rpm = get_rpm(i);
+                if (opts.fan[i].mode == MODE_LINEAR)
+                    set_duty_linear(i);
+            }
+        }
+    }
+
+    if (Serial.available())
+        handle_serial();
+}
 
 uint8_t crc8(const uint8_t *data, uint16_t len)
 {
@@ -100,7 +169,7 @@ uint16_t get_rpm(uint8_t fan)
         uint32_t time;
         FOREACH_U8(n, RPM_RETRIES) {
             time = pulseIn(pins_rpm[fan], LOW, RPM_TIMEOUT);
-            if (time >= RPM_TMIN || fan_duty[fan] == 0)
+            if (time >= RPM_TMIN || status.fan[fan].duty == 0)
                 break;
         }
         if (time >= RPM_TMIN)
@@ -110,7 +179,7 @@ uint16_t get_rpm(uint8_t fan)
     return rpm / RPM_SNUM;
 }
 
-double get_temp(uint8_t sensor)
+uint16_t get_temp(uint8_t sensor)
 {
     // Steinhart–Hart coefficients
     static const float a = 1.009249522e-03;
@@ -119,20 +188,24 @@ double get_temp(uint8_t sensor)
 
     int v0 = analogRead(pins_tmp[sensor]);
     if (!v0)
-        return TMP_NCONN;
+        return NCONN;
 
     float r2 = TMP_R * (1023.0 / (float)v0 - 1.0);
     float log_r2 = log(r2);
-    float temp = 1.0 / (a + b*log_r2 + c*log_r2*log_r2*log_r2);
+    float t = 1.0 / (a + b*log_r2 + c*log_r2*log_r2*log_r2);
 
-    return temp - 273.15;
+    double temp = t - 273.15;
+    if (opts.temp_unit == DEG_F)
+        temp = t * 1.8 + 32.0;
+
+    return (uint16_t)(temp * 100.0);
 }
 
 void set_duty(uint8_t fan, uint8_t value)
 {
     if (value > 100)
         value = 100;
-    fan_duty[fan] = value;
+    status.fan[fan].duty = value;
 
     int duty = (int)value * (fan == 1 ? TIMER4_TOP : TIMER13_TOP);
     duty /= 100;
@@ -147,19 +220,21 @@ void set_duty(uint8_t fan, uint8_t value)
 
 void set_duty_linear(uint8_t fan)
 {
-    double t = temp[opts.fan[fan].sensor];
+    double temp = status.temp[opts.fan[fan].sensor];
+    double t_min = (double)opts.fan[fan].param.min_temp;
+    double t_max = (double)opts.fan[fan].param.max_temp;
 
     uint8_t duty;
-    if (t <= opts.fan[fan].linear_min_temp)
-        duty = opts.fan[fan].linear_min_duty;
-    else if (t >= opts.fan[fan].linear_max_temp)
-        duty = opts.fan[fan].linear_max_duty;
+    if (temp <= t_min)
+        duty = opts.fan[fan].param.min_duty;
+    else if (temp >= t_max)
+        duty = opts.fan[fan].param.max_duty;
     else
-        duty = opts.fan[fan].linear_min_duty + (t - opts.fan[fan].linear_min_temp) *
-            (opts.fan[fan].linear_max_duty - opts.fan[fan].linear_min_duty) /
-            (opts.fan[fan].linear_max_temp - opts.fan[fan].linear_min_temp);
+        duty = opts.fan[fan].param.min_duty + (temp - t_min) *
+            (opts.fan[fan].param.max_duty - opts.fan[fan].param.min_duty) /
+            (t_max - t_min);
 
-    if (fan_duty[fan] != duty)
+    if (status.fan[fan].duty != duty)
         set_duty(fan, duty);
 }
 
@@ -172,382 +247,177 @@ void fan_scan()
 
     FOREACH_FAN(i) {
         FOREACH_U8(n, SCAN_TRIES) {
-            fan_connected[i] = get_rpm(i) > 0;
-            if (fan_connected[i])
+            status.fan[i].rpm = get_rpm(i);
+            if (status.fan[i].rpm > 0)
                 break;
         }
+        if (status.fan[i].rpm == 0)
+            status.fan[i].rpm = NCONN;
+        set_duty(i, DEF_DUTY);
     }
 }
 
-void print_status()
+void reset()
 {
-    FOREACH_FAN(i) {
-        char *pbuf = buffer;
-        pbuf += sprintf(pbuf, "Fan %d: ", i+1);
-        if (fan_connected[i])
-            pbuf += sprintf(pbuf, "%02d%% @ %u rpm", fan_duty[i], fan_rpm[i]);
-        else
-            pbuf += sprintf(pbuf, "disconnected");
-        S_PUTS(buffer);
-    }
-
-    FOREACH_TMP(i) {
-        char *pbuf = buffer;
-        pbuf += sprintf(pbuf, "Temp %d: ", i+1);
-        if (temp[i] != TMP_NCONN) {
-            dtostrf(temp[i], 4, 2, pbuf);
-            pbuf += strlen(pbuf);
-            pbuf += sprintf(pbuf, " C");
-        } else {
-            pbuf += sprintf(pbuf, "disconnected");
-        }
-        S_PUTS(buffer);
-    }
+    wdt_enable(50);
+    while (true) {};
 }
 
 void handle_serial()
 {
-    byte read = Serial.readBytesUntil('\n', buffer, SERIAL_BUFS);
-    if (read == 0)
-        return;
-    buffer[read] = '\0';
-    if (buffer[read-1] == '\r')
-        buffer[read-1] = '\0';
-
-    char *command = strtok(buffer, " ");
-    if (command == NULL) {
-        S_EPUTS("no command given");
-        return;
-    }
-    char *arg1 = strtok(NULL, " ");
-    char *arg2 = strtok(NULL, " ");
-
-    FOREACH_U8(i, sizeof(commands) / sizeof(command_t)) {
-        if (strcmp(command, commands[i].name) == 0) {
-            commands[i].handler(arg1, arg2);
-            return;
+    bool sof = false;
+    while (Serial.available()) {
+        int read = Serial.read();
+        if (read == -1)
+            continue;
+        if ((uint8_t)read == SOF) {
+            sof = true;
+            break;
         }
     }
-
-    // must not use S_ERROR() here as that would touch the same buffer
-    // `command` is pointing to
-    Serial.print("Error: unknown command '");
-    Serial.print(command);
-    Serial.println("'");
-}
-
-void cmd_set(const char *s_fan, char *s_duty)
-{
-    if (s_fan == NULL) {
-        S_EPUTS("no fan no. given");
+    if (!sof)
         return;
-    }
-    if (s_duty == NULL) {
-        S_EPUTS("no duty value given");
+
+    int command = Serial.read();
+    if (command == -1)
         return;
-    }
-    int fan = atoi(s_fan);
-    int duty = atoi(s_duty);
 
-    if (fan <= 0 || fan > NUM_FAN) {
-        S_ERROR("invalid fan no. '%d'", fan);
-        return;
-    }
-    if (duty < 0 || duty > 100) {
-        S_ERROR("invalid fan duty '%d'", duty);
-        return;
-    }
-
-    if (opts.fan[fan-1].mode != MODE_MANUAL) {
-        S_EPUTS("temperature-based fan control mode active");
-        return;
-    }
-
-    S_PRINTF("Setting fan %d duty %d%%", fan, duty);
-
-    fan--;
-    set_duty(fan, duty);
-    opts.fan[fan].mode = MODE_MANUAL;
-    opts.fan[fan].duty = duty;
-}
-
-void cmd_status(const char *s_interval, char*)
-{
-    if (s_interval == NULL) {
-        print_status();
-        return;
-    }
-
-    int interval = atoi(s_interval);
-    if (interval < 0 || interval > UINT8_MAX) {
-        S_ERROR("invalid interval '%d'", interval);
-        return;
-    }
-
-    S_PRINTF("Setting status interval %d", interval);
-
-    opts.stats_int = (uint8_t)interval;
-}
-
-void cmd_mode(const char *s_fan, char *s_mode)
-{
-    int fan = atoi(s_fan);
-    if (fan <= 0 || fan > NUM_FAN) {
-        S_ERROR("invalid fan no. '%d'", fan);
-        return;
-    }
-    fan--;
-
-    if (s_mode == NULL) {
-        S_PRINTF("Fan %d set to mode '%s'", fan+1, modestr[opts.fan[fan].mode]);
-        return;
-    }
-
-    FOREACH_U8(i, sizeof(modestr) / sizeof(char *)) {
-        if (strcmp(s_mode, modestr[i]) == 0) {
-            S_PRINTF("Setting fan %d mode '%s'", fan+1, modestr[i]);
-            opts.fan[fan].mode = (mode_t)i;
-            return;
+    size_t reply_len = 0;
+    char *reply = buffer;
+    switch ((cmd_t)command) {
+        case CMD_VERSION:
+            reply_len = sizeof(version_t);
+            reply = (char *)&version;
+            break;
+        case CMD_STATUS:
+            reply_len = sizeof(status_t);
+            reply = (char *)&status;
+            break;
+        case CMD_CONFIG:
+            reply_len = sizeof(config_t);
+            reply = (char *)&opts;
+            break;
+        case CMD_FAN_MODE:
+        {
+            reply_len = 1;
+            buffer[0] = RESULT_ERR;
+            if (Serial.readBytes(buffer, sizeof(msg_fan_mode_t)) ==
+                    sizeof(msg_fan_mode_t)) {
+                msg_fan_mode_t *msg = (msg_fan_mode_t *)buffer;
+                if (msg->fan < NUM_FAN && (msg->mode == MODE_MANUAL ||
+                                           msg->mode == MODE_LINEAR)) {
+                    opts.fan[msg->fan].mode = msg->mode;
+                    if (msg->mode == MODE_MANUAL)
+                        set_duty(msg->fan, opts.fan[msg->fan].duty);
+                    else if (msg->mode == MODE_LINEAR)
+                        set_duty_linear(msg->fan);
+                    buffer[0] = RESULT_OK;
+                }
+            }
+            break;
         }
-    }
-
-    S_EPUTS("invalid fan mode");
-}
-
-void cmd_load(const char *, char*)
-{
-    if (opts_load())
-        S_PUTS("Settings loaded from EEPROM");
-    else
-        S_PUTS("Failed to load settings from EEPROM!");
-}
-
-void cmd_save(const char*, char*)
-{
-    opts_save();
-    S_PUTS("Settings saved to EEPROM");
-}
-
-void cmd_map(const char *s_fan, char *s_tmp)
-{
-    int fan = atoi(s_fan);
-    if (fan <= 0 || fan > NUM_FAN) {
-        S_ERROR("invalid fan no. '%d'", fan);
-        return;
-    }
-
-    if (s_tmp != NULL) {
-        int tmp = atoi(s_tmp);
-        if (tmp <= 0 || tmp > NUM_TMP) {
-            S_ERROR("invalid sensor no. '%d'", tmp);
-            return;
+        case CMD_FAN_DUTY:
+        {
+            reply_len = 1;
+            buffer[0] = RESULT_ERR;
+            if (Serial.readBytes(buffer, sizeof(msg_fan_duty_t)) ==
+                    sizeof(msg_fan_duty_t)) {
+                msg_fan_duty_t *msg = (msg_fan_duty_t *)buffer;
+                if (msg->fan < NUM_FAN && msg->duty <= 100) {
+                    opts.fan[msg->fan].mode = MODE_MANUAL;
+                    opts.fan[msg->fan].duty = msg->duty;
+                    set_duty(msg->fan, msg->duty);
+                    buffer[0] = RESULT_OK;
+                }
+            }
+            break;
         }
-        opts.fan[fan-1].sensor = (uint8_t)tmp-1;
+        case CMD_FAN_MAP:
+        {
+            reply_len = 1;
+            buffer[0] = RESULT_ERR;
+            if (Serial.readBytes(buffer, sizeof(msg_fan_map_t)) ==
+                    sizeof(msg_fan_map_t)) {
+                msg_fan_map_t *msg = (msg_fan_map_t *)buffer;
+                if (msg->fan < NUM_FAN && msg->sensor < NUM_TEMP) {
+                    buffer[0] = RESULT_OK;
+                    opts.fan[msg->fan].sensor = msg->sensor;
+                }
+            }
+            break;
+        }
+        case CMD_LINEAR:
+        {
+            reply_len = 1;
+            buffer[0] = RESULT_ERR;
+            if (Serial.readBytes(buffer, sizeof(msg_fan_linear_t)) ==
+                    sizeof(msg_fan_linear_t)) {
+                msg_fan_linear_t *msg = (msg_fan_linear_t *)buffer;
+                if ( msg->fan < NUM_FAN && msg->param.min_duty <= 100 &&
+                                           msg->param.max_duty <= 100) {
+                    opts.fan[msg->fan].param = msg->param;
+                    buffer[0] = RESULT_OK;
+                }
+            }
+            break;
+        }
+        case CMD_FAN_CURVE:
+            reply_len = sizeof(msg_fan_curve_t);
+            fan_curve();
+            break;
+        case CMD_SAVE:
+            reply_len = 1;
+            buffer[0] = RESULT_OK;
+            opts_save();
+            break;
+        case CMD_LOAD:
+            reply_len = 1;
+            buffer[0] = opts_load() ? RESULT_OK : RESULT_ERR;
+            break;
+        case CMD_RESET:
+            reset();
+            break;
+        default:
+            Serial.write(SOF);
+            Serial.write(CMD_INVALID);
+            return;
     }
 
-    S_PRINTF("Fan %d mapped to sensor %d", fan, opts.fan[fan-1].sensor+1);
+    Serial.write(SOF);
+    Serial.write((uint8_t)command);
+    Serial.write(reply, reply_len);
 }
 
-void cmd_linear(const char *s_fan, char *s_param)
+void fan_curve()
 {
-    int fan = atoi(s_fan);
-    if (fan <= 0 || fan > NUM_FAN) {
-        S_ERROR("invalid fan no. '%d'", fan);
-        return;
-    }
-    fan--;
-
-    if (s_param != NULL) {
-        char *s_tmin = strtok(s_param, ",");
-        char *s_dmin = strtok(NULL, ",");
-        char *s_tmax = strtok(NULL, ",");
-        char *s_dmax = strtok(NULL, ",");
-        if (!(s_tmin && s_dmin && s_tmax && s_dmax)) {
-            S_EPUTS("invalid parameter string");
-            return;
-        }
-
-        double tmin = atof(s_tmin);
-        double tmax = atof(s_tmax);
-        int dmin = atoi(s_dmin);
-        int dmax = atoi(s_dmax);
-        if (dmin < 0 || dmin > 100 || dmax < 0 || dmax > 100) {
-            S_EPUTS("invalid duty value(s)");
-            return;
-        }
-
-        opts.fan[fan].linear_min_temp = tmin;
-        opts.fan[fan].linear_min_duty = dmin;
-        opts.fan[fan].linear_max_temp = tmax;
-        opts.fan[fan].linear_max_duty = dmax;
-    }
-
-    char *pbuf = buffer;
-    pbuf += snprintf(pbuf, SERIAL_BUFS-(pbuf-buffer),
-        "Fan %d linear params ", fan+1);
-    dtostrf(opts.fan[fan].linear_min_temp, 4, 2, pbuf);
-    pbuf += strlen(pbuf);
-    pbuf += snprintf(pbuf, SERIAL_BUFS-(pbuf-buffer), ",%d,",
-        opts.fan[fan].linear_min_duty);
-    dtostrf(opts.fan[fan].linear_max_temp, 4, 2, pbuf);
-    pbuf += strlen(pbuf);
-    pbuf += snprintf(pbuf, SERIAL_BUFS-(pbuf-buffer), ",%d",
-        opts.fan[fan].linear_max_duty);
-    S_PUTS(buffer);
-}
-
-void cmd_curve(const char*, char*)
-{
+    msg_fan_curve_t *data = (msg_fan_curve_t *)buffer;
     uint16_t rpm[NUM_FAN][CURVE_SMPNUM];
 
-    // CSV header
-    char *pbuf = buffer;
-    pbuf += snprintf(pbuf, SERIAL_BUFS, "duty,");
-    FOREACH_FAN(i)
-        pbuf += snprintf(pbuf, SERIAL_BUFS-(pbuf-buffer), "fan%d,", i+1);
-    Serial.println(buffer);
+    for (int i=0; i<=100/CURVE_STEP; i++) {
+        uint8_t duty = 100 - i * CURVE_STEP;
+        FOREACH_FAN(f)
+            set_duty(f, duty);
+        data->points[i].duty = duty;
 
-    // CSV data rows
-    for (int duty=100; duty>=0; duty-=CURVE_STEP) {
-        FOREACH_FAN(i)
-            set_duty(i, duty);
         delay(CURVE_SDELAY);
 
         FOREACH_U8(n, CURVE_SMPNUM) {
-            FOREACH_FAN(i)
-                rpm[i][n] = get_rpm(i);
+            FOREACH_FAN(f)
+                rpm[f][n] = get_rpm(f);
             delay(CURVE_SMPDEL);
         }
-        FOREACH_FAN(i) {
-            for (int n=1; n<CURVE_SMPNUM; n++)
-                rpm[i][0] += rpm[i][n];
-            rpm[i][0] /= CURVE_SMPNUM;
-        }
 
-        pbuf = buffer;
-        pbuf += snprintf(pbuf, SERIAL_BUFS, "%d,", duty);
-        FOREACH_FAN(i)
-            pbuf += snprintf(pbuf, SERIAL_BUFS-(pbuf-buffer), "%u,", rpm[i][0]);
-        Serial.println(buffer);
+        FOREACH_FAN(f) {
+            for (int n=1; n<CURVE_SMPNUM; n++)
+                rpm[f][0] += rpm[f][n];
+            data->points[i].rpm[f] = rpm[f][0] / CURVE_SMPNUM;
+        }
     }
 
     // restore manual duty
     FOREACH_FAN(i)
         if (opts.fan[i].mode == MODE_MANUAL)
             set_duty(i, opts.fan[i].duty);
-}
-
-void cmd_reset(const char*, char*)
-{
-    wdt_enable(50);
-    while (true) {};
-}
-
-void cmd_help(const char*, char*)
-{
-    S_PUTS("Available commands:");
-    FOREACH_U8(i, sizeof(commands) / sizeof(command_t)) {
-        S_PRINTF("    %s", commands[i].name);
-    }
-}
-
-void cmd_version(const char*, char*)
-{
-    S_PUTS("Version: " VERSION);
-    S_PUTS("Built:   " __DATE__ " " __TIME__);
-}
-
-
-void setup()
-{
-    // I/O pins
-    FOREACH_FAN(i) {
-        pinMode(pins_pwm[i], OUTPUT);
-        pinMode(pins_rpm[i], INPUT);
-    }
-    FOREACH_TMP(i)
-        pinMode(pins_tmp[i], INPUT);
-
-    // setup timer1 for 25 kHz PWM
-    TCCR1A = 0;
-    TCCR1B = 0;
-    TCCR1C = 0;
-    TCNT1  = 0;
-    TCCR1A = _BV(COM1A1) | _BV(COM1B1) | _BV(COM1C1) | _BV(WGM11);
-    TCCR1B = _BV(WGM13) | _BV(CS10);
-    TCCR1C = _BV(WGM13) | _BV(CS10);
-    ICR1   = TIMER13_TOP;
-
-    // setup timer3 for 25 kHz PWM
-    TCCR3A = 0;
-    TCNT3  = 0;
-    TCCR3A = _BV(COM1A1) | _BV(WGM11);
-    TCCR3B = _BV(WGM13) | _BV(CS10);
-    ICR3   = TIMER13_TOP;
-
-    // setup timer4 for ~25 kHz PWM (close enough)
-    TCCR4A = 0;
-    TCCR4B = 4;
-    TCCR4C = 0;
-    TCCR4D = 0;
-    PLLFRQ = (PLLFRQ & 0xCF) | 0x30;
-    OCR4C  = TIMER4_TOP;
-    DDRD   |= 1<<7;
-    TCCR4C |= 0x09;
-
-    // scan connected fans
-    fan_scan();
-
-    // initialize defaults
-    opts.stats_int = DEF_SINT;
-    FOREACH_FAN(i) {
-        fan_rpm[i] = 0;
-        opts.fan[i].mode = DEF_MODE;
-        opts.fan[i].duty = DEF_DUTY;
-        opts.fan[i].sensor = DEF_MAP;
-        opts.fan[i].linear_min_temp = DEF_LIN_TL;
-        opts.fan[i].linear_min_duty = DEF_LIN_DL;
-        opts.fan[i].linear_max_temp = DEF_LIN_TU;
-        opts.fan[i].linear_max_duty = DEF_LIN_DU;
-        set_duty(i, fan_connected[i] ? DEF_DUTY : 0);
-    }
-
-    // load settings
-    opts_load();
-
-    // serial
-    Serial.begin(SERIAL_BAUD);
-    Serial.setTimeout(SERIAL_TIMO);
-
-    S_PUTS("Initialization complete");
-}
-
-void loop()
-{
-    uint32_t now = millis();
-
-    static uint32_t measure_next = 0;
-    if (now > measure_next) {
-        measure_next = now + UPDATE_INT;
-        FOREACH_TMP(i)
-            temp[i] = get_temp(i);
-        FOREACH_FAN(i) {
-            if (fan_connected[i]) {
-                fan_rpm[i] = get_rpm(i);
-                if (opts.fan[i].mode == MODE_LINEAR)
-                    set_duty_linear(i);
-            }
-        }
-    }
-
-    static uint32_t status_next = 0;
-    if (opts.stats_int && now > status_next) {
-        status_next = now + opts.stats_int * 1000;
-        print_status();
-    }
-
-    if (Serial.available())
-        handle_serial();
 }
 
 /* vim: set ts=4 sw=4 et */
