@@ -21,6 +21,10 @@ GIT_VERSION := $(shell git describe --exact-match 2>/dev/null)
 ifndef GIT_VERSION
 GIT_VERSION := $(shell git rev-parse --short HEAD 2>/dev/null)
 endif
+GIT_DIRTY := $(shell git status --porcelain)
+ifdef GIT_DIRTY
+GIT_VERSION := $(GIT_VERSION)*
+endif
 ifdef GIT_VERSION
 CPPFLAGS += -DVERSION="\"$(GIT_VERSION)\""
 endif
