@@ -5,6 +5,7 @@ addons:
   apt:
     packages:
     - arduino-mk
+    - cmake
 cache:
   directories:
     - ~/arduino
@@ -18,3 +19,4 @@ before_install:
   - rm -f ${IDE_TAR}
 script:
   - make -C firmware ARDUINO_DIR=${IDE_DIR} ARCHITECTURE=avr
+  - mkdir fanboycli/build && cd fanboycli/build && cmake .. && make
