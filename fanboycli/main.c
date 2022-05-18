@@ -236,9 +236,9 @@ int main(int argc, char *argv[])
             }
             case 'M':
             {
-                uint8_t sensor = atoi(optarg);
-                if (sensor == 0 || sensor > NUM_TEMP) {
-                    fprintf(stderr, "Error: invalid sensor no. '%d'\n", sensor);
+                uint8_t sensor = atoi(optarg) - 1;
+                if (sensor >= NUM_TEMP) {
+                    fprintf(stderr, "Error: invalid sensor no. '%s'\n", optarg);
                     ret = false;
                     goto cleanup;
                 }
