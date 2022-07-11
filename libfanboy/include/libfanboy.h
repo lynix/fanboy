@@ -14,6 +14,7 @@ typedef msg_version_t    fb_version_t;
 typedef msg_config_t     fb_config_t;
 typedef msg_fan_curve_t  fb_curve_t;
 typedef linear_t         fb_linear_t;
+typedef pidc_t           fb_pid_t;
 
 #ifdef __cplusplus
 extern "C" {
@@ -136,6 +137,19 @@ bool fb_fan_curve(fb_curve_t *result);
  *       be retrieved using `fb_error()`.
  */
 bool fb_set_linear(uint8_t fan, fb_linear_t *param);
+
+/**
+ * @brief Set PID fan control parameters
+ *
+ * @param     fan    No. of fan to set parameters for (counted by zero)
+ * @param[in] param  Control parameter values
+ *
+ * @return true on success, false otherwise
+ *
+ * @note In case of failure this function makes an error message available to
+ *       be retrieved using `fb_error()`.
+ */
+bool fb_set_pid(uint8_t fan, fb_pid_t *param);
 
 /**
  * @brief Save current configuration to EEPROM

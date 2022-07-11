@@ -32,6 +32,7 @@ typedef enum {
     CMD_LINEAR     = 0x07,  //< set linear fan control parameters
     CMD_SAVE       = 0x08,  //< save settings to EEPROM
     CMD_LOAD       = 0x09,  //< load settings from EEPROM
+    CMD_PID        = 0x0a,  //< set PID fan control parameters
     CMD_INVALID    = 0xfe,  //< invalid command
     CMD_RESET      = 0xff   //< reset device
 } cmd_t;
@@ -49,7 +50,8 @@ typedef enum {
  */
 typedef enum {
     MODE_MANUAL  = 0x00,    //< manual duty
-    MODE_LINEAR  = 0x01     //< linear curve between two points
+    MODE_LINEAR  = 0x01,    //< linear curve between two points
+    MODE_PID     = 0x02
 } fan_mode_t;
 
 /**
@@ -79,6 +81,15 @@ typedef struct {
 } linear_t;
 
 /**
+ * @brief PID fan control parameters dataset
+ */
+typedef struct {
+    uint16_t target_temp;   //< target temperature
+    uint8_t  min_duty;      //< min fan duty (cutoff)
+    uint8_t  max_duty;      //< max fan duty (cutoff)
+} pidc_t;
+
+/**
  * @brief Fan status dataset
  */
 typedef struct {
@@ -98,10 +109,11 @@ typedef struct {
  * @brief Fan configuration dataset
  */
 typedef struct {
-    uint8_t   mode;         //< fan mode
-    uint8_t   duty;         //< fan duty (for manual mode)
-    uint8_t   sensor;       //< fan<->sensor mapping (for linear mode)
-    linear_t  param;        //< linear control parameters
+    uint8_t   mode;          //< fan mode
+    uint8_t   duty;          //< fan duty (for manual mode)
+    uint8_t   sensor;        //< fan<->sensor mapping (for linear mode)
+    linear_t  param_linear;  //< linear control parameters
+    pidc_t    param_pid;     //< PID control parameters
 } fan_config_t;
 
 /**
@@ -190,6 +202,14 @@ typedef struct {
     uint8_t   fan;          //< fan no. (counted from zero)
     linear_t  param;        //< linear control parameters
 } msg_fan_linear_t;
+
+/**
+ * @brief Payload for `CMD_PID` message, setting PID fan control parameters
+ */
+typedef struct {
+    uint8_t   fan;          //< fan no. (counted from zero)
+    pidc_t    param;        //< PID control parameters
+} msg_fan_pid_t;
 
 
 #pragma pack(pop)

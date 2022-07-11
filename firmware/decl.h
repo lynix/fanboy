@@ -89,6 +89,14 @@ void set_duty(uint8_t fan, uint8_t value);
 void set_duty_linear(uint8_t fan);
 
 /**
+ * @brief Set fan duty according target temperature using PID control
+ *
+ * @param  fan         Fan no.
+ * @param  time_diff   Milliseconds since last PID run
+ */
+void set_duty_pid(uint8_t fan, uint32_t time_diff);
+
+/**
  * @brief Save current settings to EEPROM
  */
 void opts_save();

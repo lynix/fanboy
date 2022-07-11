@@ -38,6 +38,9 @@
 #define DEF_LIN_TU     4000                   // Default linear upper temperature
 #define DEF_LIN_DL     33                     // Default linear lower duty (%)
 #define DEF_LIN_DU     80                     // Default linear upper duty (%)
+#define DEF_PID_TGT    2000                   // Default target temperature for PID control
+#define DEF_PID_MIN    0                      // Default min duty for PID control (%)
+#define DEF_PID_MAX    100                    // Default max duty for PID control (%)
 
 #define SCAN_DUTY      50                     // Fan scan duty (%)
 #define SCAN_SETTLE    2000                   // Fan scan settle delay (ms)
@@ -51,6 +54,10 @@
 #define CURVE_SDELAY   5000                   // Curve settle delay (ms)
 #define CURVE_SMPNUM   3                      // Curve sample num per duty
 #define CURVE_SMPDEL   50                     // Curve delay between samples (ms)
+
+#define PID_P          2                      // P term for PID control
+#define PID_I          5                      // I term for PID control
+#define PID_D          1                      // D term for PID control
 
 #ifndef VERSION
 #define VERSION        "unknown"              // Fallback version string

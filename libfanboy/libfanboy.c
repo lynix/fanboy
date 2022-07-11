@@ -126,6 +126,13 @@ bool fb_set_linear(uint8_t fan, fb_linear_t *param)
     return simple_query(CMD_LINEAR, &msg, sizeof(msg));
 }
 
+bool fb_set_pid(uint8_t fan, fb_pid_t *param)
+{
+    msg_fan_pid_t msg = { .fan = fan, .param = *param };
+
+    return simple_query(CMD_PID, &msg, sizeof(msg));
+}
+
 bool fb_fan_curve(fb_curve_t *result)
 {
     error = NULL;

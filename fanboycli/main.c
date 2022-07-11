@@ -40,9 +40,10 @@ static inline void print_help()
     puts(  "Fan Control:");
     printf("  -f FAN   Select fan FAN to control (1-%d)\n", NUM_FAN);
     puts(  "  -d DUTY  Set selected fan to fixed duty (0-100)");
-    puts(  "  -m MODE  Set fan control mode ('manual' or 'linear')");
+    puts(  "  -m MODE  Set fan control mode ('manual', 'linear' or 'pid')");
     printf("  -M TEMP  Set mapped sensor no. (1-%d)\n", NUM_TEMP);
     puts(  "  -l PARA  Set linear control parameters (format see below)\n");
+    puts(  "  -p PARA  Set PID control parameters (format see below)\n");
 
     puts(  "Device Management:");
     puts(  "  -L       Load configuration from EEPROM");
@@ -61,12 +62,15 @@ static inline void print_help()
     puts(  "  LOW_DUTY   Fan duty applied when temperature <= TEMP_LOW");
     puts(  "  HIGH_DUTY  Fan duty applied when temperature >= TEMP_HIGH\n");
 
-    puts(  "Fan duty follows a linear curve between LOW_DUTY and HIGH_DUTY.\n");
+    puts(  "PID parameter format: 'TGT_TEMP:MIN_DUTY:MAX_DUTY'");
+    puts(  "  TGT_TEMP   Target temperature");
+    puts(  "  MIN_DUTY   Lower limit for fan duty");
+    puts(  "  MAX_DUTY   Upper limit for fan duty\n");
 
     puts(  "This version of fanboycli was built " __DATE__ " " __TIME__ "\n");
 }
 
-static inline bool get_params(char *string, linear_t *params)
+static inline bool get_params_linear(char *string, linear_t *params)
 {
     const char *ptr = strtok(string, PARAM_DELIMITER);
     if (ptr == NULL)
@@ -95,6 +99,30 @@ static inline bool get_params(char *string, linear_t *params)
     return true;
 }
 
+static inline bool get_params_pid(char *string, pidc_t *params)
+{
+    const char *ptr = strtok(string, PARAM_DELIMITER);
+    if (ptr == NULL)
+        return false;
+    params->target_temp = atof(ptr) * 100.0;
+
+    ptr = strtok(NULL, PARAM_DELIMITER);
+    if (ptr == NULL)
+        return false;
+    params->min_duty = atoi(ptr);
+
+    ptr = strtok(NULL, PARAM_DELIMITER);
+    if (ptr == NULL)
+        return false;
+    params->max_duty = atoi(ptr);
+
+    if (params->min_duty > 100 || params->max_duty > 100 ||
+            params->target_temp > 10000)
+        return false;
+
+    return true;
+}
+
 static inline void print_config(const fb_config_t *config)
 {
     puts("FanBoy config:");
@@ -109,10 +137,17 @@ static inline void print_config(const fb_config_t *config)
         printf("    Manual duty:  %02d%%\n", config->fan[i].duty);
         printf("    Sensor:       %d\n", config->fan[i].sensor+1);
         puts("    Linear params:");
-        printf("      Low:   %02d%% @ %.2f %c\n", config->fan[i].param.min_duty,
-               (double)config->fan[i].param.min_temp/100.0, unit);
-        printf("      High:  %02d%% @ %.2f %c\n", config->fan[i].param.max_duty,
-               (double)config->fan[i].param.max_temp/100.0, unit);
+        printf("      Low:   %02d%% @ %.2f %c\n",
+            config->fan[i].param_linear.min_duty,
+            (double)config->fan[i].param_linear.min_temp/100.0, unit);
+        printf("      High:  %02d%% @ %.2f %c\n",
+            config->fan[i].param_linear.max_duty,
+            (double)config->fan[i].param_linear.max_temp/100.0, unit);
+        puts("    PID params:");
+        printf("      Target:  %.2f %c\n",
+            (double)config->fan[i].param_pid.target_temp/100.0, unit);
+        printf("      Min:     %02d%%\n", config->fan[i].param_pid.min_duty);
+        printf("      Max:     %02d%%\n", config->fan[i].param_pid.max_duty);
     }
 }
 
@@ -148,7 +183,7 @@ int main(int argc, char *argv[])
     bool ret = true;
     uint8_t fan = 255;
     char c;
-    while ((c = getopt(argc, argv, "D:sf:d:m:M:cl:CSLRhV")) != -1) {
+    while ((c = getopt(argc, argv, "D:sf:d:m:M:cl:p:CSLRhV")) != -1) {
         switch (c) {
             case 'h':
             {
@@ -218,6 +253,8 @@ int main(int argc, char *argv[])
                     mode = MODE_MANUAL;
                 else if (strcmp("linear", optarg) == 0)
                     mode = MODE_LINEAR;
+                else if (strcmp("pid", optarg) == 0)
+                    mode = MODE_PID;
                 else {
                     fprintf(stderr, "Error: invalid fan mode '%s'\n", optarg);
                     ret = false;
@@ -256,7 +293,7 @@ int main(int argc, char *argv[])
             case 'l':
             {
                 fb_linear_t params;
-                if (!get_params(optarg, &params)) {
+                if (!get_params_linear(optarg, &params)) {
                     fprintf(stderr, "Error: invalid parameter string\n");
                     ret = false;
                     goto cleanup;
@@ -267,6 +304,26 @@ int main(int argc, char *argv[])
                     goto cleanup;
                 }
                 if (!fb_set_linear(fan, &params)) {
+                    fprintf(stderr, "Failed to set linear parameters: %s\n",
+                            fb_error());
+                    ret = false;
+                }
+                break;
+            }
+            case 'p':
+            {
+                fb_pid_t params;
+                if (!get_params_pid(optarg, &params)) {
+                    fprintf(stderr, "Error: invalid parameter string\n");
+                    ret = false;
+                    goto cleanup;
+                }
+                if (fan >= NUM_FAN) {
+                    fprintf(stderr, "Error: invalid fan no. '%d'\n", fan);
+                    ret = false;
+                    goto cleanup;
+                }
+                if (!fb_set_pid(fan, &params)) {
                     fprintf(stderr, "Failed to set linear parameters: %s\n",
                             fb_error());
                     ret = false;

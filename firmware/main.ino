@@ -19,6 +19,9 @@ static config_t    opts;
 static status_t    status;
 static version_t   version;
 static char        buffer[SERIAL_BUFS];
+static uint32_t    pid_last_time = 0;
+static double      pid_last_error[NUM_FAN];
+static double      pid_error_i[NUM_FAN];
 
 
 void setup()
@@ -73,10 +76,15 @@ void setup()
         opts.fan[i].mode = DEF_MODE;
         opts.fan[i].duty = DEF_DUTY;
         opts.fan[i].sensor = DEF_MAP;
-        opts.fan[i].param.min_temp = DEF_LIN_TL;
-        opts.fan[i].param.min_duty = DEF_LIN_DL;
-        opts.fan[i].param.max_temp = DEF_LIN_TU;
-        opts.fan[i].param.max_duty = DEF_LIN_DU;
+        opts.fan[i].param_linear.min_temp = DEF_LIN_TL;
+        opts.fan[i].param_linear.min_duty = DEF_LIN_DL;
+        opts.fan[i].param_linear.max_temp = DEF_LIN_TU;
+        opts.fan[i].param_linear.max_duty = DEF_LIN_DU;
+        opts.fan[i].param_pid.min_duty = DEF_PID_MIN;
+        opts.fan[i].param_pid.max_duty = DEF_PID_MAX;
+        opts.fan[i].param_pid.target_temp = DEF_PID_TGT;
+        pid_last_error[i] = 0;
+        pid_error_i[i] = 0;
     }
 
     // load configuration from EEPROM
@@ -93,7 +101,6 @@ void loop()
 
     static uint32_t measure_next = 0;
     if (now > measure_next) {
-        measure_next = now + UPDATE_INT;
         FOREACH_TEMP(i)
             status.temp[i] = get_temp(i);
         FOREACH_FAN(i) {
@@ -101,8 +108,12 @@ void loop()
                 status.fan[i].rpm = get_rpm(i);
                 if (opts.fan[i].mode == MODE_LINEAR)
                     set_duty_linear(i);
+                else if (opts.fan[i].mode == MODE_PID)
+                    set_duty_pid(i, now - pid_last_time);
             }
         }
+        measure_next = now + UPDATE_INT;
+        pid_last_time = now;
     }
 
     if (Serial.available())
@@ -221,21 +232,41 @@ void set_duty(uint8_t fan, uint8_t value)
 void set_duty_linear(uint8_t fan)
 {
     double temp = status.temp[opts.fan[fan].sensor];
-    double t_min = (double)opts.fan[fan].param.min_temp;
-    double t_max = (double)opts.fan[fan].param.max_temp;
+    double t_min = (double)opts.fan[fan].param_linear.min_temp;
+    double t_max = (double)opts.fan[fan].param_linear.max_temp;
 
     uint8_t duty;
     if (temp <= t_min)
-        duty = opts.fan[fan].param.min_duty;
+        duty = opts.fan[fan].param_linear.min_duty;
     else if (temp >= t_max)
-        duty = opts.fan[fan].param.max_duty;
+        duty = opts.fan[fan].param_linear.max_duty;
     else
-        duty = opts.fan[fan].param.min_duty + (temp - t_min) *
-            (opts.fan[fan].param.max_duty - opts.fan[fan].param.min_duty) /
-            (t_max - t_min);
+        duty = opts.fan[fan].param_linear.min_duty + (temp - t_min) *
+            (opts.fan[fan].param_linear.max_duty -
+            opts.fan[fan].param_linear.min_duty) / (t_max - t_min);
 
     if (status.fan[fan].duty != duty)
         set_duty(fan, duty);
+}
+
+void set_duty_pid(uint8_t fan, uint32_t time_diff)
+{
+    double error = opts.fan[fan].param_pid.target_temp -
+        status.temp[opts.fan[fan].sensor];
+    double error_d = (error - pid_last_error[fan]) / (double)time_diff;
+    pid_error_i[fan] += error * (double)time_diff;
+
+    double fduty = PID_P * error + PID_I * pid_error_i[fan] + PID_D * error_d;
+    if (fduty < opts.fan[fan].param_pid.min_duty)
+        fduty = opts.fan[fan].param_pid.min_duty;
+    else if (fduty > opts.fan[fan].param_pid.max_duty)
+        fduty = opts.fan[fan].param_pid.max_duty;
+
+    uint8_t duty = (uint8_t)fduty;
+    if (status.fan[fan].duty != duty)
+        set_duty(fan, duty);
+
+    pid_last_error[fan] = error;
 }
 
 void fan_scan()
@@ -305,7 +336,7 @@ void handle_serial()
                     sizeof(msg_fan_mode_t)) {
                 msg_fan_mode_t *msg = (msg_fan_mode_t *)buffer;
                 if (msg->fan < NUM_FAN && (msg->mode == MODE_MANUAL ||
-                                           msg->mode == MODE_LINEAR)) {
+                        msg->mode == MODE_LINEAR || msg->mode == MODE_PID)) {
                     opts.fan[msg->fan].mode = msg->mode;
                     if (msg->mode == MODE_MANUAL)
                         set_duty(msg->fan, opts.fan[msg->fan].duty);
@@ -353,9 +384,24 @@ void handle_serial()
             if (Serial.readBytes(buffer, sizeof(msg_fan_linear_t)) ==
                     sizeof(msg_fan_linear_t)) {
                 msg_fan_linear_t *msg = (msg_fan_linear_t *)buffer;
-                if ( msg->fan < NUM_FAN && msg->param.min_duty <= 100 &&
-                                           msg->param.max_duty <= 100) {
-                    opts.fan[msg->fan].param = msg->param;
+                if (msg->fan < NUM_FAN && msg->param.min_duty <= 100 &&
+                        msg->param.max_duty <= 100) {
+                    opts.fan[msg->fan].param_linear = msg->param;
+                    buffer[0] = RESULT_OK;
+                }
+            }
+            break;
+        }
+        case CMD_PID:
+        {
+            reply_len = 1;
+            buffer[0] = RESULT_ERR;
+            if (Serial.readBytes(buffer, sizeof(msg_fan_pid_t)) ==
+                    sizeof(msg_fan_pid_t)) {
+                msg_fan_pid_t *msg = (msg_fan_pid_t *)buffer;
+                if (msg->fan < NUM_FAN && msg->param.min_duty <= 100 &&
+                        msg->param.max_duty <= 100) {
+                    opts.fan[msg->fan].param_pid = msg->param;
                     buffer[0] = RESULT_OK;
                 }
             }
