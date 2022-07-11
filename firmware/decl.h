@@ -28,9 +28,9 @@ struct eeprom_t
 
 /**
  * @brief CRC8 helper function
- * 
+ *
  * Used to protect settings stored in EEPROM from bit-rot.
- * 
+ *
  * @param[in]  data  Pointer to beginning of data to cover
  * @param      len   Number of bytes to cover
  * @returns    8-bit check value for given data
@@ -39,10 +39,10 @@ uint8_t crc8(const uint8_t *data, uint16_t len);
 
 /**
  * @brief Determine current fan RPM
- * 
+ *
  * Uses Arduino's `pulseIn()` mechanism to measure the length of the LOW-pulse
  * emitted by the Hall sensor of the fan.
- * 
+ *
  * @param    fan  Fan no.
  * @returns  Current fan speed in RPM
  * @note     This function can take a considerable amount of time
@@ -53,7 +53,7 @@ uint16_t get_rpm(uint8_t fan);
 
 /**
  * @brief Determine current sensor temperature
- * 
+ *
  * @param    sensor  Sensor no.
  * @returns  Current temperature multiplied by 100 as integer
  */
@@ -61,7 +61,7 @@ uint16_t get_temp(uint8_t sensor);
 
 /**
  * @brief Set fan duty
- * 
+ *
  * @param  fan    Fan no.
  * @param  value  Duty value to apply, in percent (0-100)
  */
@@ -95,14 +95,14 @@ void opts_save();
 
 /**
  * @brief Load and apply settings from EEPROM
- * 
+ *
  * @returns  `true` on success, `false` if no settings found in EEPROM
  */
 bool opts_load();
 
 /**
  * @brief Detect connected fans
- * 
+ *
  * Ramps up all fans to fixed duty (`SCAN_DUTY`) and checks for valid RPM
  * signal. Marks fans without the latter as unconnected. This is used to save
  * execution time consumed by unnecessary calls to `get_rpm()`.
@@ -111,7 +111,7 @@ void fan_scan();
 
 /**
  * @brief Detect connected fans
- * 
+ *
  * Determines fan characteristic by ramping duty values from 100% down to 0% in
  * `CURVE_STEP`% steps, taking `CURVE_SAMPLE_NUM` samples of the fan RPM. Saves
  * measured RPM values in serial buffer.
@@ -125,7 +125,7 @@ void handle_serial();
 
 /**
  * @brief Reset MCU
- * 
+ *
  * Uses the integrated watchdog to hard-reset the device, i.e. jump to boot
  * loader. This clears all registers and re-initializes USB.
  */
