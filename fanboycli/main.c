@@ -9,7 +9,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
- 
+
 #include "libfanboy.h"
 
 #if defined linux
@@ -347,6 +347,6 @@ int main(int argc, char *argv[])
 
 cleanup:
 	fb_exit();
-	
+
     return !ret;
 }
