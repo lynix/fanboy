@@ -33,7 +33,6 @@
 #define DEF_UNIT       DEG_C                  // Default temperature unit (C)
 #define DEF_MODE       MODE_MANUAL            // Default operation mode
 #define DEF_DUTY       50                     // Default fixed fan duty (%)
-#define DEF_SINT       0                      // Default status interval (s)
 #define DEF_MAP        0                      // Default sensor mapping
 #define DEF_LIN_TL     2000                   // Default linear lower temperature
 #define DEF_LIN_TU     4000                   // Default linear upper temperature
