@@ -1,0 +1,46 @@
+name: Build
+
+on:
+  push:
+    branches: [ "master" ]
+
+jobs:
+  firmware:
+    runs-on: ubuntu-latest
+    env:
+      IDE_VERS: 1.8.9
+      IDE_DIR: arduino
+    steps:
+    - name: cache Arduino IDE
+      uses: actions/cache@v3
+      id: cache-ide
+      env:
+        cache-name: cache-arduino-ide
+      with:
+        path: ~/${{ env.IDE_DIR }}
+        key: arduino-${{ env.IDE_VERS }}
+    - name: install Arduino IDE
+      env:
+        IDE_TAR: arduino-${{ env.IDE_VERS }}-linux64.tar.xz
+      if: steps.cache-ide.outputs.cache-hit != 'true'
+      run: |
+        wget -q "http://downloads.arduino.cc/${IDE_TAR}"
+        mkdir ~/${IDE_DIR}
+        tar -xJf ${IDE_TAR} -C ~/${IDE_DIR} --strip-components=1
+        rm ${IDE_TAR}
+    - name: install build dependencies
+      run: sudo apt-get install -qq -y arduino-mk
+    - uses: actions/checkout@v3
+    - name: build
+      run: make -C firmware ARDUINO_DIR=~/${IDE_DIR} ARCHITECTURE=avr
+  fanboycli:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - name: install build dependencies
+      run: sudo apt-get install -q -y cmake gcc
+    - name: build
+      run: |
+        cd fanboycli
+        cmake .
+        cmake --build .
